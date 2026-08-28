@@ -31,7 +31,7 @@ const _useStableDerived = ReanimatedMod?.useDerivedValue
 
 interface Props {
   bgItemId: string | null | undefined;
-  context?: 'profile' | 'room' | 'chat' | 'home' | 'myrooms';
+  context?: 'profile' | 'room' | 'chat' | 'home' | 'myrooms' | 'messages' | 'edit-profile' | 'leaderboard' | 'notifications';
   children?: React.ReactNode;
   style?: ViewStyle;
 }

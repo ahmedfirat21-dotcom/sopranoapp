@@ -283,7 +283,7 @@ const ConversationCard = React.memo(function ConversationCard({
                 // �?? v109: Taslak göstergesi �?? kırmızımsı turuncu, "Taslak: ..." önekli
                 <>
                   <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '700', marginRight: 4 }}>
-                    {i18n.t('tabs.messages.053')}
+                    {i18n.t('tabs.messages.draft_prefix')}
                   </Text>
                   <Text style={[styles.msgText, { fontStyle: 'italic' }]} numberOfLines={1}>
                     {item.draft}
@@ -448,7 +448,7 @@ export default function MessagesScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // �?? Yazıyor... �?? listedeki konu�?malarda canlı typing indicator
   const [typingPartners, setTypingPartners] = useState<Set<string>>(new Set());
-  const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const typingTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // �?? Ar�?iv görünümü �?? varsayılan: normal (ar�?ivsiz), toggle ile ar�?ivlenenleri göster
   const [showArchived, setShowArchived] = useState(false);
   // �?? 2026-04-22: Mesaj istekleri görünümü �?? Instagram-style "İstekler" bölümü
@@ -833,7 +833,7 @@ export default function MessagesScreen() {
       setConversations(prev => prev.filter(c => c.partner_id !== partnerId));
       refreshBadges();
     } catch {
-      showToast({ title: i18n.t('tabs.messages.054'), message: i18n.t('tabs.messages.055'), type: 'error' });
+      showToast({ title: i18n.t('tabs.messages.delete_failed_title'), message: i18n.t('tabs.messages.delete_failed_message'), type: 'error' });
     }
   }, [firebaseUser, refreshBadges]);
 
@@ -920,7 +920,7 @@ export default function MessagesScreen() {
       await MessageService.toggleMute(firebaseUser.uid, partnerId);
       showToast({
         title: newMuted ? i18n.t('tabs.messages.023', { name: partnerName }) : i18n.t('tabs.messages.024'),
-        message: newMuted ? i18n.t('tabs.messages.056') : undefined,
+        message: newMuted ? i18n.t('tabs.messages.mute_enabled_message') : undefined,
         type: 'success',
       });
     } catch {
@@ -1056,7 +1056,7 @@ export default function MessagesScreen() {
             <AnimatedHeaderIconBtn index={2} style={styles.headerIconBtn} onPress={() => openSearch({
               mode: 'compose',
               onSelectUser: (userId) => router.push(`/chat/${userId}` as any),
-            })} accessibilityLabel={i18n.t('tabs.messages.057')}>
+            })} accessibilityLabel={i18n.t('tabs.messages.compose_new_message')}>
               <Ionicons name="create-outline" size={22} color="#F1F5F9" style={styles.headerIcon} />
             </AnimatedHeaderIconBtn>
           </View>

@@ -60,6 +60,7 @@ export default function EditProfileScreen() {
   const { t } = useTranslation();
   const { profile, firebaseUser, setProfile, setUser, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
+  const userId = firebaseUser?.uid || profile?.id;
 
   // === Profile fields ===
   const [displayName, setDisplayName] = useState(profile?.display_name || '');
@@ -151,8 +152,6 @@ export default function EditProfileScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const formContainerY = useRef(0);
   const fieldPositions = useRef<Record<string, number>>({});
-
-  const userId = firebaseUser?.uid || profile?.id;
 
   const isGoogleUser = firebaseUser?.providerData?.some(p => p.providerId === 'google.com') ?? false;
   const isEmailUser = firebaseUser?.providerData?.some(p => p.providerId === 'password') ?? false;

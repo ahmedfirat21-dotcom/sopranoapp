@@ -414,7 +414,8 @@ export default function StoreScreen() {
   // ★ v107 hotfix: pill tıklama scroll-to-section anchor — ScrollView ref + her section'ın y offset'i
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<CategoryKey, number>>({
-    bundles: 0, frames: 0, entry_effect: 0, gifts: 0, sp: 0,
+    bundles: 0, frames: 0, entry_effect: 0, glow_message: 0,
+    badge: 0, background: 0, effect: 0, emoji: 0, sp: 0,
   });
   const scrollToSection = (key: CategoryKey) => {
     setActiveCat(key);
@@ -603,7 +604,7 @@ export default function StoreScreen() {
               setSuccessModal({
                 visible: true,
                 title: i18n.t('auto.store.029', { 0: bundle.name }),
-                subtitle: i18n.t('auto.store.028', { 0: r.items_added || bundle.item_ids.length, 1: r.cost }),
+                subtitle: i18n.t('auto.store.028', { 0: r.items_added || bundle.item_ids.length, 1: r.cost ?? 0 }),
                 accent: accentForRarity(bundle.rarity),
               });
               setInventory((prev) => {
@@ -646,7 +647,7 @@ export default function StoreScreen() {
       setSuccessModal({
         visible: true,
         title: i18n.t('auto.store.026', { 0: label }),
-        subtitle: i18n.t('auto.store.025', { 0: item.name, 1: r.cost }),
+        subtitle: i18n.t('auto.store.025', { 0: item.name, 1: r.cost ?? 0 }),
         accent: accentForRarity(item.rarity),
       });
       setInventory((prev) => new Set(prev).add(item.id));

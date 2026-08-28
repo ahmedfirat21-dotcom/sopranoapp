@@ -48,8 +48,8 @@ export default function SopranoRadioPlayer({ player, onOpenChannelSheet }: Props
       // Eq barlar — her bar farklı süre + farklı tepe yüksekliği
       const makeBar = (val: Animated.Value, dur: number) =>
         Animated.loop(Animated.sequence([
-          Animated.timing(val, { toValue: 1.0, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
-          Animated.timing(val, { toValue: 0.25, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+          Animated.timing(val, { toValue: 1.0, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0.25, duration: dur, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         ]));
       const loops = [makeBar(eq1, 380), makeBar(eq2, 520), makeBar(eq3, 440)];
       loops.forEach(l => l.start());
@@ -73,17 +73,6 @@ export default function SopranoRadioPlayer({ player, onOpenChannelSheet }: Props
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-  const eqH = (v: Animated.Value) => v.interpolate({
-    inputRange: [0, 1],
-    outputRange: [3, 16],
-    extrapolate: 'clamp',
-  });
-  const miniEqH = (v: Animated.Value) => v.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, 10],
-    extrapolate: 'clamp',
-  });
-
   const isPlaying = player.status === 'playing';
   const isLoading = player.status === 'loading';
   const isError = player.status === 'error';
@@ -103,9 +92,9 @@ export default function SopranoRadioPlayer({ player, onOpenChannelSheet }: Props
           {/* Mini equalizer — sadece playing iken görünür */}
           {isPlaying ? (
             <View style={s.miniEqBars}>
-              <Animated.View style={[s.miniEqBar, { height: miniEqH(eq1) }]} />
-              <Animated.View style={[s.miniEqBar, { height: miniEqH(eq2) }]} />
-              <Animated.View style={[s.miniEqBar, { height: miniEqH(eq3) }]} />
+              <Animated.View style={[s.miniEqBar, { transform: [{ scaleY: eq1 }] }]} />
+              <Animated.View style={[s.miniEqBar, { transform: [{ scaleY: eq2 }] }]} />
+              <Animated.View style={[s.miniEqBar, { transform: [{ scaleY: eq3 }] }]} />
             </View>
           ) : null}
           <Text style={s.hiddenLabel}>Radyo</Text>
@@ -149,9 +138,9 @@ export default function SopranoRadioPlayer({ player, onOpenChannelSheet }: Props
           {isPlaying ? (
             // ★ Ses dalga (equalizer) — kırmızı dot yerine 3 bar
             <View style={s.eqBars}>
-              <Animated.View style={[s.eqBar, { height: eqH(eq1) }]} />
-              <Animated.View style={[s.eqBar, { height: eqH(eq2) }]} />
-              <Animated.View style={[s.eqBar, { height: eqH(eq3) }]} />
+              <Animated.View style={[s.eqBar, { transform: [{ scaleY: eq1 }] }]} />
+              <Animated.View style={[s.eqBar, { transform: [{ scaleY: eq2 }] }]} />
+              <Animated.View style={[s.eqBar, { transform: [{ scaleY: eq3 }] }]} />
             </View>
           ) : (
             isError ? <View style={[s.liveDot, { backgroundColor: '#F59E0B' }]} /> : null
@@ -246,7 +235,7 @@ const s = StyleSheet.create({
     gap: 2,
   },
   eqBar: {
-    width: 2.5,
+    width: 2.5, height: 16,
     borderRadius: 1.5,
     backgroundColor: '#EF4444',
     shadowColor: '#EF4444', shadowOpacity: 0.7, shadowRadius: 2,
@@ -325,7 +314,7 @@ const s = StyleSheet.create({
     gap: 1.5,
   },
   miniEqBar: {
-    width: 1.8,
+    width: 1.8, height: 10,
     borderRadius: 1,
     backgroundColor: '#FBBF24',
     shadowColor: '#FBBF24', shadowOpacity: 0.6, shadowRadius: 1.5,

@@ -481,7 +481,7 @@ export const RoomAccessService = {
           sender_id: invitedBy,
           type: 'room_invite',
           reference_id: roomId,
-          body: i18n.t('auto.roomAccess.007', { 0: inviterName, 1: roomName }),
+          body: i18n.t('auto.roomAccess.007', { 0: inviterName || 'Birisi', 1: roomName || 'bir oda' }),
         });
         if (notifError && __DEV__) {
           if (__DEV__) console.warn('[InviteUser] Bildirim insert hatası:', notifError.message, notifError.details);

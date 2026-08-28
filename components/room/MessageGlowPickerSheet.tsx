@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { i18n } from '../../services/i18n';
 import {
   View, Text, StyleSheet, Pressable, Animated, PanResponder, Dimensions, Platform,
-  ScrollView, useWindowDimensions, Easing, Modal,
+  ScrollView, useWindowDimensions, Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -41,9 +41,11 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   // ★ v110.6 fix (6 May 2026): Panel ekranın %92'sine çıkarıldı — alt içerik kırpılıyordu.
   //   maxAllowed sabit cap (640) yerine ekrana oranlı; içerik tüm ürünleri görsün.
   const PANEL_HEIGHT = useMemo(() => {
-    const topPad = Math.max(insets.top, 24) + 24;
-    const maxAllowed = windowH - topPad;
-    return Math.max(480, maxAllowed);
+    const topPad = Math.max(insets.top, 24) + 12;
+    const bottomPad = Math.max(insets.bottom, 12);
+    const maxAllowed = windowH - topPad - bottomPad;
+    // Kullanılabilir ekrandan uzun panel snap mesafesini ve dokunmayı bozuyordu.
+    return Math.max(280, Math.min(windowH * 0.92, maxAllowed));
   }, [windowH, insets.top, insets.bottom]);
   // ★ v1.7.13.146 (24 May 2026): 3-snap pattern (HALF/FULL/DISMISS).
   //   Default açılış HALF (yarım), yukarı çekince FULL, aşağı çekince DISMISS.
@@ -83,9 +85,9 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   onCloseRef.current = onClose;
   const panResponder = useRef(
     PanResponder.create({
-      // Bu responder yalnızca handle+header'a bağlı. Dokunulduğu anda sahiplenmek,
-      // üstteki RoomChatDrawer Modal'ının hareketi yutmasını engeller.
+      // Parent sohbet sheet'i hareketi çalmadan handle/header alanında yakala.
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
       onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.3,
       onPanResponderTerminationRequest: () => false,
@@ -151,16 +153,6 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
   if (!visible) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      presentationStyle="overFullScreen"
-      statusBarTranslucent
-      navigationBarTranslucent
-      hardwareAccelerated
-      onRequestClose={onClose}
-    >
     <View style={StyleSheet.absoluteFillObject as any} pointerEvents="box-none">
       {/* ★ v110.7 fix (7 May 2026): Android elevation eklendi.
           RoomChatDrawer sheet'i elevation:58 ile renderlanıyor; picker'ın ScrollView
@@ -336,7 +328,6 @@ export default function MessageGlowPickerSheet({ visible, onClose, currentSP, on
         </Animated.View>
       </View>
     </View>
-    </Modal>
   );
 }
 

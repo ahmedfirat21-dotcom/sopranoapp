@@ -13,6 +13,7 @@
  */
 import { supabase } from '../constants/supabase';
 import { Platform } from 'react-native';
+import { i18n } from './i18n';
 
 let APP_VERSION = 'unknown';
 try {

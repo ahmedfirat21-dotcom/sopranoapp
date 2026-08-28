@@ -302,22 +302,21 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
     const followPromise = (currentUserId && !isOwnProfile)
       ? FollowService.isFollowing(currentUserId, targetUserId).catch(() => false)
       : Promise.resolve(false);
-    const currentRoomPromise = supabase.from('room_participants')
+    const currentRoomPromise = Promise.resolve(supabase.from('room_participants')
       .select('room_id, rooms!inner(id, name, is_live)')
       .eq('user_id', targetUserId)
       .limit(1)
       .then(r => {
         const row = r.data?.[0] as any;
         return row?.rooms?.is_live ? { id: row.rooms.id, name: row.rooms.name } : null;
-      })
-      .catch(() => null as null);
+      })).catch(() => null as null);
     // �?? v110.14 (8 May 2026): Hedef kullanıcı zaten odadaysa "Odama Davet" butonu
     //   gösterilmemeli �?? odada olan birini odaya davet etmek anlamsız.
     // �?? v1.7.13.135: Eskiden target-zaten-odada durumunda da null döndürüyordu �??
     //   handleInviteToMyRoom "�?nce bir oda aç" diyordu (oda aslında VARDI). �?imdi
     //   room object dolu döner + targetIsParticipant flag �?? UI butonu do�?ru gizler.
     const myLiveRoomPromise = (currentUserId && !isOwnProfile)
-      ? supabase.from('rooms').select('id, name').eq('host_id', currentUserId).eq('is_live', true).limit(1)
+      ? Promise.resolve(supabase.from('rooms').select('id, name').eq('host_id', currentUserId).eq('is_live', true).limit(1)
           .then(async (r) => {
             const row = r.data?.[0] as any;
             if (!row) return null;
@@ -329,7 +328,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
               .maybeSingle();
             return { id: row.id, name: row.name, targetIsParticipant: !!partRow };
           })
-          .catch(() => null as null)
+          ).catch(() => null as null)
       : Promise.resolve(null as null);
     const friendListPromise = FriendshipService.getFriends(targetUserId).catch(() => [] as any[]);
     const myFriendsPromise = (currentUserId && !isOwnProfile)
@@ -703,7 +702,7 @@ export default function InRoomUserProfile({ visible, userId, currentUserId, onCl
       setCAlert({
         visible: true,
         title: 'Zaten odanda',
-        message: `${targetUser?.display_name || 'Bu kullanıcı'} zaten "${myLiveRoom.name}" odasında.`,
+        message: `${userProfile?.display_name || 'Bu kullanıcı'} zaten "${myLiveRoom.name}" odasında.`,
         type: 'info',
         buttons: [{ text: 'Tamam', style: 'cancel' }],
       });

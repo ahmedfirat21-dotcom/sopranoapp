@@ -869,8 +869,8 @@ export default function MyRoomsScreen() {
   const searchInputRef = useRef<TextInput>(null);
 
   // �?? Realtime kanal ba�?ımlılık fix: ref pattern
-  const loadDataRef = useRef<() => Promise<void>>();
-  const refreshFriendsLiveRef = useRef<() => Promise<void>>();
+  const loadDataRef = useRef<(() => Promise<void>) | null>(null);
+  const refreshFriendsLiveRef = useRef<(() => Promise<void>) | null>(null);
 
   // �?? Profile ba�?ımlılı�?ını daralt �?? sadece ihtiyaç duyulan alanlar
   const subscriptionTier = (profile?.subscription_tier || 'Free') as SubscriptionTier;
@@ -940,14 +940,14 @@ export default function MyRoomsScreen() {
       // �?? v1.7.13.141: Toplu takipçi sayısı �?? tek sorguda tüm odaların follower count'u
       if (managed.length > 0) {
         const roomIds = managed.map(r => r.id);
-        supabase.from('room_follows').select('room_id').in('room_id', roomIds)
+        Promise.resolve(supabase.from('room_follows').select('room_id').in('room_id', roomIds)
           .then(({ data: follows }) => {
             const counts: Record<string, number> = {};
             (follows || []).forEach((f: any) => {
               counts[f.room_id] = (counts[f.room_id] || 0) + 1;
             });
             setFollowerCounts(counts);
-          }).catch(() => {});
+          })).catch(() => {});
       }
 
       // 2b) Recent rooms

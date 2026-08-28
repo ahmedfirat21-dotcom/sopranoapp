@@ -94,6 +94,7 @@ export default function Item3DArt({
     : _rawFit === 'fill' ? 'stretch'
     : _rawFit === 'none' ? 'center'
     : 'contain';
+  const lottieFit: 'cover' | 'contain' | 'center' = coverFit === 'stretch' ? 'contain' : coverFit;
   const baseSymbol = fullSize ? 0.80 : 0.95;
   const symbolSize = fullSize
     ? `${Math.round(baseSymbol * coverScale * 100)}%`
@@ -164,7 +165,7 @@ export default function Item3DArt({
             autoPlay={!staticMode}
             loop={!staticMode}
             style={{ width: '100%', height: '100%' }}
-            resizeMode={coverFit}
+            resizeMode={lottieFit}
           />
         </Animated.View>
       ) : remoteAsset?.url && remoteAsset.type === 'image' ? (

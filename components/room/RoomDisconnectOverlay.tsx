@@ -19,7 +19,7 @@ const iconShadow = {
 
 type Props = {
   /** LiveKit connection state */
-  state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected';
+  state: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'failed';
   /** "Tekrar Dene" — yeniden bağlan */
   onRetry: () => void;
   /** "Odadan Çık" */

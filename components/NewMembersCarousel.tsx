@@ -6,6 +6,7 @@ import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StatusAvatar from './StatusAvatar';
 import { NewMembersService, type NewMember } from '../services/newMembers';
+import { i18n } from '../services/i18n';
 
 interface Props {
   onPressUser: (userId: string) => void;

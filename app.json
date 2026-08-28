@@ -2,7 +2,7 @@
   "expo": {
     "name": "SopranoChat",
     "slug": "SopranoChat",
-    "version": "1.7.13.161",
+    "version": "1.7.13.162",
     "privacy": "public",
     "orientation": "portrait",
     "icon": "./assets/app_icon.png",
@@ -34,7 +34,7 @@
         "foregroundImage": "./assets/launcher_icon_padded.png"
       },
       "package": "com.sopranochat",
-      "versionCode": 388,
+      "versionCode": 389,
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",

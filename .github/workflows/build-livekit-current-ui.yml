@@ -6,6 +6,7 @@ on:
     branches:
       - fix/livekit-current-ui
       - fix/keyboard-overlay-root
+      - fix/critical-audit-162
 
 jobs:
   android:
@@ -30,16 +31,16 @@ jobs:
       - name: Generate Android splash resources
         run: node scripts/gen-splash-logo.js
 
-      - name: Build Android test APK and App Bundle
+      - name: Build Android test APK and unsigned App Bundle
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleDebug bundleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.161-glow-picker-drag-fix-apk-aab
+          name: sopranochat-1.7.13.162-critical-fixes-apk-aab
           path: |
-            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error

@@ -596,7 +596,7 @@ export default function ChatScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 80);
     }
   }, [keyboardVisible, kbHeight]);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true); // ★ BUG-6 FIX: Kullanıcı en altta mı?
   // ★ 2026-04-26: İlk açılışta otomatik en alta scroll (son mesaj görünür) — bir kez tetiklenir.
@@ -854,7 +854,7 @@ export default function ChatScreen() {
         // ── Aşama 2: DETAYLAR paralel arka plan — UI zaten render ──
         Promise.all([
           // Aktif odadaysa davet butonu göster
-          supabase
+          Promise.resolve(supabase
             .from('room_participants')
             .select('room_id, rooms!inner(id, name)')
             .eq('user_id', firebaseUser.uid)
@@ -862,7 +862,7 @@ export default function ChatScreen() {
             .single()
             .then(({ data }) => {
               if (data?.rooms) setActiveRoom({ id: (data.rooms as any).id, name: (data.rooms as any).name });
-            }, () => {}),
+            }, () => {})),
 
           // CALL-1 + DM-8: Takipçi kontrolü
           FriendshipService.getDetailedStatus(firebaseUser.uid, id)
@@ -911,13 +911,13 @@ export default function ChatScreen() {
           })().catch(() => {}),
 
           // ★ v1.7.13.141: Mute durumu — MessageService.toggleMute ile tutarlı (conversation_state tablosu)
-          supabase
+          Promise.resolve(supabase
             .from('conversation_state')
             .select('muted_at')
             .eq('user_id', firebaseUser.uid)
             .eq('partner_id', id)
             .maybeSingle()
-            .then(({ data }) => setIsMuted(!!data?.muted_at))
+            .then(({ data }) => setIsMuted(!!data?.muted_at)))
             .catch(() => {}),
         ]);
       } catch (err) {
@@ -956,7 +956,7 @@ export default function ChatScreen() {
     });
 
     // Realtime Yazıyor... dinleyici
-    let typingResetTimer: NodeJS.Timeout | null = null;
+    let typingResetTimer: ReturnType<typeof setTimeout> | null = null;
     const typingChannel = MessageService.onTypingStatus(firebaseUser.uid, (payload) => {
       if (payload.user_id === id) {
         setIsTyping(payload.is_typing);

@@ -824,7 +824,7 @@ export const RoomService = {
     //   sıfırlar. Frozen iken trigger metadata.archived_at damgası bastı, host
     //   uyandırınca damgaları temizliyoruz. Fail olursa worst case "biraz erken
     //   silinir" — trigger her freeze'de overwrite yapıyor, veri kaybı yok.
-    supabase.rpc('clear_archived_at', { p_room_id: roomId }).then(() => {}).catch(() => {});
+    Promise.resolve(supabase.rpc('clear_archived_at', { p_room_id: roomId }).then(() => {})).catch(() => {});
 
     return data as Room;
   },
@@ -1428,11 +1428,11 @@ export const RoomService = {
 
     // ★ v309: Fire-and-forget DB cleanup — stale kayıtları sil ki herkes için temizlensin.
     //   Sonraki polling round'unda cleanup yapılmış olur. Concurrent DELETE'ler güvenli.
-    supabase.from('room_participants')
+    Promise.resolve(supabase.from('room_participants')
       .delete()
       .eq('room_id', roomId)
       .lt('last_seen_at', staleCutoffIso)
-      .then(() => {})
+      .then(() => {}))
       .catch(() => {});
 
     // ★ B2 FIX: Ghost kullanıcıları gizle (owner/moderator hariç — onlar görebilir)
@@ -1791,7 +1791,7 @@ export const RoomService = {
    * Returns: { expires_at, duration_sec } başarılıysa.
    */
   async claimStageSeat(roomId: string, userId: string): Promise<{ expires_at: string; duration_sec: number }> {
-    // ★ v51 FIX 2026-04-22: Firebase auth → auth.uid() NULL → p_executor_id fallback
+    // p_executor_id yalnızca JWT çağrısını doğrular; kimliğin yerine geçmez.
     const { data, error } = await supabase.rpc('claim_stage_seat', {
       p_room_id: roomId,
       p_user_id: userId,
@@ -1855,35 +1855,22 @@ export const RoomService = {
    * Host/Mod: Konuşmacıyı dinleyiciye düşür. Self-demote speaker→listener de desteklenir.
    * Y9: v21 atomic RPC — rol update + listener_count tek transaction.
    */
-  async demoteSpeaker(roomId: string, userId: string, executorId?: string): Promise<void> {
-    try {
-      const { error } = await supabase.rpc('demote_speaker_atomic', {
-        p_room_id: roomId,
-        p_user_id: userId,
-      });
-      if (!error) return;
-      if (__DEV__) console.warn('[demoteSpeaker] RPC fallback:', error.message);
-      if (/yetkiniz yok|owner demote/i.test(error.message || '')) throw new Error(error.message);
-    } catch (rpcErr: any) {
-      if (rpcErr?.message && /yetkiniz yok|owner demote/i.test(rpcErr.message)) throw rpcErr;
-    }
-
-    // Fallback — v21 migrate edilmediyse eski yol
-    if (executorId) await _requireRole(roomId, executorId, ['owner', 'moderator']);
-    const { data: currentPart } = await supabase
-      .from('room_participants')
-      .select('role')
-      .eq('room_id', roomId)
-      .eq('user_id', userId)
-      .maybeSingle();
-    await supabase
-      .from('room_participants')
-      .update({ role: 'listener', is_muted: false })
-      .eq('room_id', roomId)
-      .eq('user_id', userId);
-    if (currentPart && (currentPart.role === 'speaker' || currentPart.role === 'moderator')) {
-      try { await supabase.rpc('increment_listener_count', { room_id_input: roomId }); } catch { /* RPC yoksa sessiz */ }
-    }
+  async demoteSpeaker(
+    roomId: string,
+    userId: string,
+    executorId?: string,
+  ): Promise<{ cooldown_until: string | null; cooldown_sec: number }> {
+    const { data, error } = await supabase.rpc('demote_speaker_atomic', {
+      p_room_id: roomId,
+      p_user_id: userId,
+      p_executor_id: executorId,
+    });
+    if (error) throw new Error(error.message || i18n.t('auto.room.007'));
+    const result = data as any;
+    return {
+      cooldown_until: result?.cooldown_until || null,
+      cooldown_sec: Number(result?.cooldown_sec) || 0,
+    };
   },
 
   /**

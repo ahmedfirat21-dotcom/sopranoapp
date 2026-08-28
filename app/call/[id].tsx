@@ -64,8 +64,8 @@ export default function CallScreen() {
   const [isReconnecting, setIsReconnecting] = useState(false); // ★ CALL-10
   const [endReason, setEndReason] = useState<string>(''); // ★ CALL-5: Arama sonu sebebi
 
-  const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const ringTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ringTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ringbackSoundRef = useRef<Audio.Sound | null>(null); // ★ Ringback tone (tuuut tuuut)
   const busySoundRef = useRef<Audio.Sound | null>(null); // ★ Meşgul sesi
   const callStatusRef = useRef<CallStatus>(isIncoming === 'true' ? 'connected' : 'calling');
@@ -1048,4 +1048,3 @@ const st = StyleSheet.create({
     fontSize: 14, fontWeight: '700', color: '#FFF', letterSpacing: 0.3,
   },
 });
-

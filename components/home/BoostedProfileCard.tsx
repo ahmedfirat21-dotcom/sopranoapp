@@ -7,6 +7,7 @@ import { View, Text, Image, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getAvatarSource } from '../../constants/avatars';
+import { i18n } from '../../services/i18n';
 
 interface BoostedProfileCardProps {
   profile: any;

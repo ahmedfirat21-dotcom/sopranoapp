@@ -1,6 +1,5 @@
 import { logger } from '../utils/logger';
 import { supabase } from '../constants/supabase';
-import { GamificationService } from './gamification';
 import { i18n } from './i18n';
 
 export const ReferralService = {
@@ -51,95 +50,12 @@ export const ReferralService = {
       if (!referralCode || referralCode.trim().length === 0) {
         return { success: false, message: i18n.t('auto.referral.010') };
       }
-
-      const code = referralCode.trim().toUpperCase();
-
-      // 1. Kod sahibini bul
-      const { data: owner, error: ownerErr } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('referral_code', code)
-        .maybeSingle();
-
-      if (ownerErr || !owner) {
-        return { success: false, message: i18n.t('auto.referral.009') };
-      }
-
-      // Kendi kodunu kullanmasın
-      if (owner.id === referredUserId) {
-        return { success: false, message: i18n.t('auto.referral.008') };
-      }
-
-      // ★ SEC-REF1: Max 20 referral limiti — SP farming engeli
-      const { count: ownerRefCount } = await supabase
-        .from('referrals')
-        .select('*', { count: 'exact', head: true })
-        .eq('referrer_id', owner.id);
-      if ((ownerRefCount || 0) >= 20) {
-        return { success: false, message: i18n.t('auto.referral.007') };
-      }
-
-      // ★ SEC-REF2: 24 saat bekleme süresi — yeni hesabın referral kullanma engeli
-      // Onboarding sırasında bypass edilir (hesap tam o anda oluşturulmuş)
-      if (!isOnboarding) {
-        const { data: referredProfile } = await supabase
-          .from('profiles')
-          .select('created_at')
-          .eq('id', referredUserId)
-          .single();
-        if (referredProfile?.created_at) {
-          const accountAge = Date.now() - new Date(referredProfile.created_at).getTime();
-          const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-          if (accountAge < TWENTY_FOUR_HOURS) {
-            return { success: false, message: i18n.t('auto.referral.006') };
-          }
-        }
-      }
-
-      // 2. Daha önce bu kişi başka bir kod kullanmış mı?
-      const { data: existing } = await supabase
-        .from('referrals')
-        .select('id')
-        .eq('referred_id', referredUserId)
-        .maybeSingle();
-
-      if (existing) {
-        return { success: false, message: i18n.t('auto.referral.005') };
-      }
-
-      // 3. Referral kaydı oluştur
-      const { error: insertErr } = await supabase.from('referrals').insert({
-        referrer_id: owner.id,
-        referred_id: referredUserId,
-        referral_code: code,
-      });
-
-      if (insertErr) {
-        if (__DEV__) logger.warn('Referral insert error:', insertErr.message);
-        if ((insertErr as any).code === '23505') {
-          return { success: false, message: i18n.t('auto.referral.004') };
-        }
-        return { success: false, message: i18n.t('auto.referral.003') };
-      }
-
-      // 4. ★ 2026-04-21: Atomic SP bonus — v50 RPC tek transaction'da iki tarafa da verir.
-      //   Önceden 2 ayrı earn() çağrısıydı → ikincisi fail'se birincisi commit kalıyordu (asimetrik ödül).
-      const { data: bonusResult, error: bonusErr } = await supabase.rpc('award_referral_bonus_atomic', {
-        p_owner_id: owner.id,
+      const { error } = await supabase.rpc('apply_referral_code', {
+        p_code: referralCode.trim().toUpperCase(),
         p_referred_id: referredUserId,
-        p_sp_amount: 50,
+        p_is_onboarding: isOnboarding,
       });
-      if (bonusErr) {
-        if (__DEV__) logger.warn('[Referral] SP bonus RPC hatası, fallback earn denenir:', bonusErr.message);
-        // Fallback — RPC fail olursa eski yol (idempotency için earn cooldown'ı olmadığından güvenli)
-        try {
-          await GamificationService.earn(owner.id, 50, 'referral_bonus');
-          await GamificationService.earn(referredUserId, 50, 'referral_bonus');
-        } catch (fallbackErr: any) {
-          logger.error(i18n.t('auto.referral.002'), fallbackErr?.message);
-        }
-      }
-
+      if (error) return { success: false, message: error.message || i18n.t('auto.referral.003') };
       return { success: true, message: i18n.t('auto.referral.001') };
     } catch (e: any) {
       logger.error('Error applying code:', e.message);

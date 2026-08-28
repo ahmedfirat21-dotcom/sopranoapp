@@ -34,7 +34,7 @@ export function IncomingCallOverlay({ visible, callerName, callerAvatar, callTyp
   const rejectBtnAnim = useRef(new Animated.Value(0)).current;
   const soundRef = useRef<Audio.Sound | null>(null);
   const cleaningUpRef = useRef(false);
-  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const ringLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 

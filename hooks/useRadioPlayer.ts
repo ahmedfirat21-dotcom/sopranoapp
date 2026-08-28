@@ -47,12 +47,14 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
   const [currentChannelId, setCurrentChannelId] = useState<string>(DEFAULT_RADIO_CHANNEL_ID);
   const [status, setStatus] = useState<RadioStatus>('idle');
   const [hidden, setHidden] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const targetVolumeRef = useRef(1.0);
   const mountedRef = useRef(true);
   // ★ Yeniden yükleme kilidı — aynı anda birden fazla loadAndPlay çağrısını önler
   const loadingLockRef = useRef(false);
+  const pendingChannelRef = useRef<RadioChannel | null>(null);
   // ★ Buffer timeout — canlı yayın uzun süre buffer'da kalırsa yeniden dene
   const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // ★ Ardışık hata sayacı — sonsuz restart önleme
@@ -76,6 +78,7 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
         }
         if (savedHidden === '1') setHidden(true);
       } catch { /* sessiz */ }
+      finally { if (mountedRef.current) setHydrated(true); }
     })();
   }, [enabled]);
 
@@ -100,98 +103,89 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
   const loadAndPlay = useCallback(async (channel: RadioChannel) => {
     if (!enabled || !mountedRef.current) return;
 
-    // ★ Yeniden yükleme kilidi — çoklu çağrı önleme
-    if (loadingLockRef.current) return;
+    if (loadingLockRef.current) {
+      pendingChannelRef.current = channel;
+      return;
+    }
     loadingLockRef.current = true;
-
-    clearBufferTimeout();
-    setStatus('loading');
+    let requestedChannel: RadioChannel | null = channel;
 
     try {
-      // Eski sound'u temizle
-      const oldSound = soundRef.current;
-      soundRef.current = null;
-      await cleanupSound(oldSound);
+      while (requestedChannel && mountedRef.current && enabled) {
+        const channelToLoad: RadioChannel = requestedChannel;
+        requestedChannel = null;
+        pendingChannelRef.current = null;
+        clearBufferTimeout();
+        setStatus('loading');
 
-      // ★ Audio mode — expo-av'nin diğer ses kaynaklarıyla düzgün çalışması için.
-      //   LiveKit kendi AudioSession'ını yönetiyor, expo-av sadece mixWithOthers
-      //   modunda çalışmalı ki çakışmasın.
-      try {
-        await Audio.setAudioModeAsync({
-          staysActiveInBackground: true,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch { /* opsiyonel — başarısız olsa bile devam */ }
+        try {
+          // Minimize dönüşünde eski hook'un açık bıraktığı stream'i önce kapat.
+          await stopOrphanRadio();
+          const oldSound = soundRef.current;
+          soundRef.current = null;
+          await cleanupSound(oldSound);
 
-      const { sound } = await Audio.Sound.createAsync(
-        {
-          uri: channel.streamUrl,
-          headers: {
-            'User-Agent': 'SopranoChat-Android/1.7',
-            'Icy-MetaData': '1',
-          },
-        } as AVPlaybackSource,
-        {
-          shouldPlay: true,
-          // ★ v1.7.13.161: Volume ayarı kaldırıldı — sistem volume’una bırakıldı.
-          //   Telefonun ses tuşlarıyla kontrol edilebilmesi için programatik volume set edilmemeli.
-          isLooping: false,
-          // ★ Canlı yayın için progress update seyrek (kaynak tasarrufu)
-          progressUpdateIntervalMillis: 5000,
-        },
-      );
+          try {
+            await Audio.setAudioModeAsync({
+              staysActiveInBackground: true,
+              playsInSilentModeIOS: true,
+              shouldDuckAndroid: true,
+              playThroughEarpieceAndroid: false,
+            });
+          } catch { /* opsiyonel */ }
 
-      if (!mountedRef.current) {
-        await cleanupSound(sound);
-        loadingLockRef.current = false;
-        return;
-      }
+          const { sound, status: initialStatus } = await Audio.Sound.createAsync(
+            {
+              uri: channelToLoad.streamUrl,
+              headers: {
+                'User-Agent': 'SopranoChat-Android/1.7',
+                'Icy-MetaData': '1',
+              },
+            } as AVPlaybackSource,
+            {
+              shouldPlay: true,
+              isLooping: false,
+              progressUpdateIntervalMillis: 5000,
+            },
+          );
 
-      // ★ Playback status callback — sadece gerçek hataları yakala
-      sound.setOnPlaybackStatusUpdate((st: any) => {
-        if (!mountedRef.current || !st.isLoaded) {
-          // Unloaded veya unmount → temizle
-          if (st.error && mountedRef.current) {
-            setStatus('error');
+          if (!mountedRef.current) {
+            await cleanupSound(sound);
+            break;
           }
-          return;
-        }
 
-        // Gerçek hata → kullanıcıya göster, otomatik restart YAPMA
-        // (kullanıcı play'e tekrar basarak kendisi deneyebilir)
-        if (st.error) {
-          setStatus('error');
-          clearBufferTimeout();
-          return;
-        }
-
-        if (st.isPlaying) {
-          // Çalıyor — başarılı
-          if (status !== 'playing') setStatus('playing');
-          consecutiveErrorsRef.current = 0;
-          clearBufferTimeout();
-        } else if (st.isBuffering) {
-          // ★ Buffer'da takılı — 15sn sonra hâlâ buffer'daysa hata göster
-          //   Ama sonsuz restart döngüsü YAPMA. Kullanıcı karar versin.
-          if (!bufferTimeoutRef.current) {
-            bufferTimeoutRef.current = setTimeout(() => {
-              if (mountedRef.current && soundRef.current === sound) {
+          const handlePlaybackStatus = (st: any) => {
+            if (!mountedRef.current || soundRef.current !== sound) return;
+            if (!st.isLoaded || st.error) {
+              if (st.error) {
                 setStatus('error');
+                clearBufferTimeout();
               }
-              bufferTimeoutRef.current = null;
-            }, 15000);
-          }
-        }
-      });
+              return;
+            }
+            if (st.isPlaying) {
+              setStatus('playing');
+              consecutiveErrorsRef.current = 0;
+              clearBufferTimeout();
+            } else if (st.isBuffering && !bufferTimeoutRef.current) {
+              bufferTimeoutRef.current = setTimeout(() => {
+                if (mountedRef.current && soundRef.current === sound) setStatus('error');
+                bufferTimeoutRef.current = null;
+              }, 15000);
+            }
+          };
 
-      soundRef.current = sound;
-      setStatus('playing');
-      consecutiveErrorsRef.current = 0;
-    } catch (e) {
-      consecutiveErrorsRef.current++;
-      if (mountedRef.current) setStatus('error');
+          soundRef.current = sound;
+          sound.setOnPlaybackStatusUpdate(handlePlaybackStatus);
+          // Stream gerçekten başlamadan "playing" gösterme.
+          handlePlaybackStatus(initialStatus);
+        } catch {
+          consecutiveErrorsRef.current++;
+          if (mountedRef.current) setStatus('error');
+        }
+
+        requestedChannel = pendingChannelRef.current;
+      }
     } finally {
       loadingLockRef.current = false;
     }
@@ -209,11 +203,12 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
 
   // ── Auto-play on enable ──
   useEffect(() => {
-    if (!enabled || hidden) return;
+    // Kayıtlı kanal/gizlilik okunmadan varsayılan kanalı başlatma.
+    if (!enabled || !hydrated || hidden || soundRef.current) return;
     if (__DEV__) return; // Dev: autoplay devre dışı, manual play
     loadAndPlay(currentChannel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, currentChannelId]);
+  }, [enabled, hydrated, hidden]);
 
   // ── Cleanup on unmount ──
   useEffect(() => {
@@ -259,8 +254,8 @@ export function useRadioPlayer({ enabled }: UseRadioPlayerOpts) {
         consecutiveErrorsRef.current = 0;
         await loadAndPlay(currentChannel);
       } else {
-        await soundRef.current.playAsync();
-        setStatus('playing');
+        const nextStatus: any = await soundRef.current.playAsync();
+        setStatus(nextStatus?.isLoaded && nextStatus?.isPlaying ? 'playing' : 'loading');
       }
     } catch { /* sessiz */ }
   }, [status, currentChannel, loadAndPlay, clearBufferTimeout]);

@@ -103,7 +103,7 @@ export default function CollectionDetailScreen() {
               setSuccessModal({
                 visible: true,
                 title: i18n.t('auto.store.collection.id.004', { 0: label }),
-                subtitle: i18n.t('auto.store.collection.id.003', { 0: item.name, 1: r.cost }),
+                subtitle: i18n.t('auto.store.collection.id.003', { 0: item.name, 1: r.cost ?? 0 }),
                 accent: accentByRarity,
               });
               setInventory((prev) => new Set(prev).add(item.id));

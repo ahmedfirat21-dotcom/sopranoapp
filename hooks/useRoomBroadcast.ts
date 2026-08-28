@@ -45,7 +45,7 @@ type UseRoomBroadcastParams = {
   profile: { display_name?: string; is_admin?: boolean } | null;
   room: Room | null;
   router: any;
-  floatingRef: React.RefObject<FloatingReactionsRef>;
+  floatingRef: React.RefObject<FloatingReactionsRef | null>;
   setRoom: React.Dispatch<React.SetStateAction<Room | null>>;
   setParticipants: React.Dispatch<React.SetStateAction<RoomParticipant[]>>;
   setChatMessages: React.Dispatch<React.SetStateAction<RoomMessage[]>>;
@@ -57,7 +57,7 @@ type UseRoomBroadcastParams = {
   setAlertConfig: React.Dispatch<React.SetStateAction<any>>;
   roomHostRef: React.MutableRefObject<string | null>;
   /** ★ ModerationOverlay ref — ceza alan kişi ekranı */
-  penaltyRef: React.RefObject<ModerationOverlayRef>;
+  penaltyRef: React.RefObject<ModerationOverlayRef | null>;
   /** ★ Avatar flash state setter — herkes görür */
   setAvatarFlash: (userId: string, flashType: FlashType) => void;
   /** ★ BUG-1 FIX: Ref ile güncel LiveKit state — stale closure önleme */
@@ -68,7 +68,7 @@ type UseRoomBroadcastParams = {
     disableMic?: () => Promise<any>;
   }>;
   /** ★ DonationAlert ref — bağış bildirimini tüm odaya göster */
-  donationAlertRef?: React.RefObject<DonationAlertRef>;
+  donationAlertRef?: React.RefObject<DonationAlertRef | null>;
   /** ★ O4: Kendi is_chat_muted durumunu her render'da güncelle; emoji/reaction spam engeli için. */
   isChatMutedRef?: React.MutableRefObject<boolean>;
 };

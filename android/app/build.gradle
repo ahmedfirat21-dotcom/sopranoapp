@@ -92,8 +92,8 @@ android {
         applicationId 'com.sopranochat'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 388
-        versionName "1.7.13.161"
+        versionCode 389
+        versionName "1.7.13.162"
     }
     signingConfigs {
         debug {
@@ -116,8 +116,11 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Internal App Sharing re-signs every upload with Google's test key.
-            signingConfig project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
+            // Yayın paketi debug anahtarıyla asla üretilmesin. Anahtar yoksa Gradle
+            // imzasız paket üretir; Play'e yalnız release anahtarıyla imzalanan AAB gider.
+            if (project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"

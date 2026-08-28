@@ -31,7 +31,7 @@ type UseRoomGamificationParams = {
   myCurrentRole: 'owner' | 'moderator' | 'speaker' | 'listener';
   participantCount: number;
   isCameraEnabled: boolean;
-  spToastRef: React.RefObject<{ show: (sp: number, label: string) => void }>;
+  spToastRef: React.RefObject<{ show: (sp: number, label: string) => void } | null>;
 };
 
 export function useRoomGamification(params: UseRoomGamificationParams) {

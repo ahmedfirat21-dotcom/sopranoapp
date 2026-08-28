@@ -1856,7 +1856,7 @@ export default function RoomScreen() {
 
   // ★ ODA KAPANMA GERİ SAYIMI — Host+Mod yoksa 60sn sonra kapanır
   const [closingCountdown, setClosingCountdown] = useState<number | null>(null);
-  const closingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ★ Kişisel susturma (lokal) — sadece bu kullanıcı için geçerli
   const [personallyMutedUsers, setPersonallyMutedUsers] = useState<Set<string>>(new Set());
@@ -1985,7 +1985,7 @@ export default function RoomScreen() {
           icon: 'wallet-outline',
           buttons: [
             { text: i18n.t('auto.room.id.109'), style: 'cancel', onPress: () => safeGoBack(router) },
-            { text: i18n.t('auto.room.id.108'), style: 'primary', onPress: () => { safeGoBack(router); setTimeout(() => router.push('/sp-store' as any), 250); } },
+            { text: i18n.t('auto.room.id.108'), style: 'default', onPress: () => { safeGoBack(router); setTimeout(() => router.push('/sp-store' as any), 250); } },
           ],
         });
         return false;
@@ -2147,6 +2147,8 @@ export default function RoomScreen() {
   const initialLoadDone = useRef(false);
   const prevParticipantCountRef = useRef(0); // BUG-R7 FIX: stale closure önleme
   const isMinimizingRef = useRef(false); // Küçültme sırasında leave yapma
+  const canReviewPendingAccess = room?.host_id === firebaseUser?.uid
+    || participants.some(p => p.user_id === firebaseUser?.uid && (p.role === 'owner' || p.role === 'moderator'));
   // ★ 2026-04-21: Upsell ve diğer akışlarda odayı minimize + navigate pattern'i için
   // güncel payload referansı. hostUser/viewerCount/lk render'ın altında hesaplandığı için
   // ref her render'da taze tutulur (aşağıdaki useEffect).
@@ -2170,7 +2172,7 @@ export default function RoomScreen() {
   //   görüyordu, DB'de pending kayıt olsa bile. RPC server-side host/mod kontrolü
   //   yapıp güvenli şekilde dönüyor.
   useEffect(() => {
-    if (!id || !firebaseUser?.uid || !(amIHost || amIModerator)) {
+    if (!id || !firebaseUser?.uid || !canReviewPendingAccess) {
       setPendingAccessCount(0);
       return;
     }
@@ -2187,7 +2189,7 @@ export default function RoomScreen() {
     refresh();
     const interval = setInterval(refresh, 4000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [id, firebaseUser?.uid, amIHost, amIModerator]);
+  }, [id, firebaseUser?.uid, canReviewPendingAccess]);
 
   // ★ v92.10 (1 May 2026): Top Contributor pill — bu odadaki en cömert kullanıcıyı çek
   useEffect(() => {
@@ -3154,7 +3156,7 @@ export default function RoomScreen() {
     //   anında görür. Server timestamp gelince real ID ile replace.
     const content = chatInput.trim();
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const myParticipantProfile = participants.find(p => p.user_id === firebaseUser.uid)?.profile;
+    const myParticipantProfile = participants.find(p => p.user_id === firebaseUser.uid)?.user;
     // ★ v110.14: Participant listesinde yoksa (dinleyici/spectator) useAuth profile fallback —
     //   önceden myProfile undefined kalıyordu, optimistic mesajda profiles boş geliyor,
     //   render fallback "...id4" tag gösteriyordu (flash bug).
@@ -3467,7 +3469,7 @@ export default function RoomScreen() {
   // ========== OWNER / MODERATOR: ODAYI HERKES İÇİN BİTİR ==========
   const handleEndRoom = () => {
     if (!firebaseUser?.uid || !id || isSystemRoom(id as string)) return;
-    if (!amIHost && !amIMod && !profile?.is_admin) return;
+    if (!amIHost && !amIModerator && !profile?.is_admin) return;
     setAlertConfig({
       visible: true,
       title: 'Odayı Bitir',
@@ -3661,7 +3663,7 @@ export default function RoomScreen() {
           //   bu yüzden doğrudan update yapıyoruz.
           await supabase
             .from('room_participants')
-            .update({ role: 'listener', is_muted: false })
+            .update({ role: 'listener', is_muted: false, stage_expires_at: null })
             .eq('room_id', id as string)
             .eq('user_id', firebaseUser.uid);
           // listener_count artır
@@ -3671,18 +3673,23 @@ export default function RoomScreen() {
           //   İki adımlı: önce speaker'a düşür sonra listener'a. Tek adımda yapılabilir:
           await supabase
             .from('room_participants')
-            .update({ role: 'listener', is_muted: false })
+            .update({ role: 'listener', is_muted: false, stage_expires_at: null })
             .eq('room_id', id as string)
             .eq('user_id', firebaseUser.uid);
           try { await supabase.rpc('increment_listener_count', { room_id_input: id as string }); } catch {}
         } else {
           // ★ Normal speaker — standart demote akışı
-          await RoomService.demoteSpeaker(id as string, firebaseUser.uid);
+          const result = await RoomService.demoteSpeaker(id as string, firebaseUser.uid, firebaseUser.uid);
+          setParticipants(prev => prev.map(p => p.user_id === firebaseUser.uid
+            ? { ...p, stage_expires_at: result.cooldown_until }
+            : p));
         }
 
         // ★ BUG FIX: 'self_demote' broadcast — kendi ModerationOverlay'ını tetiklemesin
         modChannelRef.current?.send({ type: 'broadcast', event: 'mod_action', payload: { action: 'self_demote', targetUserId: firebaseUser.uid } });
-        setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid ? { ...p, role: 'listener' as const } : p));
+        setParticipants(prev => prev.map(p => p.user_id === firebaseUser!.uid
+          ? { ...p, role: 'listener' as const }
+          : p));
         // ★ BUG FIX: Sahneden inince el kaldırma durumunu sıfırla — aksi halde sırada kalır
         setMyMicRequested(false);
         setMicRequests(prev => prev.filter(u => u !== firebaseUser!.uid));

@@ -688,12 +688,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isAuthReady) return; // Firebase & Profil kontrolü bitene kadar bekle
 
     const inAuthGroup = segments[0] === '(auth)';
-    const isOnboarding = segments.length > 1 && segments[1] === 'onboarding';
+    const segmentList = segments as readonly string[];
+    const isOnboarding = segmentList.length > 1 && segmentList[1] === 'onboarding';
     // ★ v107.46: Şifre sıfırlama deep link bağlamında AuthGuard hiçbir yönlendirme yapmasın.
     //   Email maili tıklayan kullanıcı zaten oobCode ile reset-password ekranına geliyor;
     //   AuthGuard onu login'e ya da home'a sürüklerse mail linki kırılır.
     //   app/auth/reset-password.tsx (grupsuz) → segments = ['auth', 'reset-password']
-    const isResetPassword = segments[0] === 'auth' && segments[1] === 'reset-password';
+    const isResetPassword = segmentList[0] === 'auth' && segmentList[1] === 'reset-password';
     if (isResetPassword) return;
 
     if (!isLoggedIn) {
@@ -945,7 +946,7 @@ export default function RootLayout() {
     if (appIsReady && (fontsLoaded || fontError)) {
       const timer = setTimeout(async () => {
         try {
-          await SplashScreen.hideAsync({ fade: true } as any);
+          await SplashScreen.hideAsync();
         } catch (e) {
           if (__DEV__) console.warn('[RootLayout] Splash gizleme hatası:', e);
         }

@@ -1036,7 +1036,7 @@ export default function HomeScreen() {
   );
 
   // ★ Realtime kanal bağımlılık fix: loadData'yı ref ile sar
-  const loadDataRef = useRef<() => Promise<void>>();
+  const loadDataRef = useRef<(() => Promise<void>) | null>(null);
 
 
   const loadData = useCallback(async () => {

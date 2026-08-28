@@ -24,7 +24,7 @@ import { showToast } from '../components/Toast';
 import PurchaseSuccessModal from '../components/PurchaseSuccessModal';
 import { useAuth } from './_layout';
 import { SupportService, type SupportCategory, type SupportTicket } from '../services/support';
-import { useTranslation } from '../services/i18n';
+import { i18n, useTranslation } from '../services/i18n';
 
 const CATEGORIES: { key: SupportCategory; icon: string; labelTr: string; descTr: string; color: string }[] = [
   { key: 'bug',        icon: 'bug',                  labelTr: 'Hata Bildir',     descTr: 'Uygulamada bir sorunla karşılaştın',      color: '#EF4444' },
