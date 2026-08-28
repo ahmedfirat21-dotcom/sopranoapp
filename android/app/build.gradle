@@ -120,6 +120,10 @@ android {
             // imzasız paket üretir; Play'e yalnız release anahtarıyla imzalanan AAB gider.
             if (project.hasProperty('SOPRANOCHAT_UPLOAD_STORE_FILE')) {
                 signingConfig signingConfigs.release
+            } else if (project.hasProperty('SOPRANOCHAT_TEST_RELEASE_WITH_DEBUG_KEY')) {
+                // Standalone device-test APK: release JS bundle + repository test key.
+                // This flag is never used for the Play App Bundle build.
+                signingConfig signingConfigs.debug
             }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds

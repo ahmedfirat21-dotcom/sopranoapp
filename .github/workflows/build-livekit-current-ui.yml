@@ -31,16 +31,20 @@ jobs:
       - name: Generate Android splash resources
         run: node scripts/gen-splash-logo.js
 
-      - name: Build Android test APK and unsigned App Bundle
+      - name: Build standalone Android test APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug bundleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon -PSOPRANOCHAT_TEST_RELEASE_WITH_DEBUG_KEY=true
+
+      - name: Build unsigned Android App Bundle
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.162-critical-fixes-apk-aab
+          name: sopranochat-1.7.13.162-standalone-release-apk-aab
           path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
