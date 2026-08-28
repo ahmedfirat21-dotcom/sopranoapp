@@ -99,7 +99,11 @@ const allowedActions = new Set([
   "claim", "heartbeat", "request", "cancel", "list",
   "promote", "reject", "demote",
 ]);
-const roomIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// PostgreSQL's uuid type accepts the full canonical 8-4-4-4-12 hexadecimal
+// form. The permanent Soprano Lobby intentionally uses a sentinel UUID whose
+// version/variant nibbles are zero, so RFC-version filtering would reject the
+// real database key before the RPC can authorize the system room.
+const roomIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
