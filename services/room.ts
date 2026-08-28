@@ -83,6 +83,30 @@ async function _requireRole(
   }
 }
 
+type SystemStageAction =
+  | 'claim' | 'heartbeat' | 'request' | 'cancel' | 'list'
+  | 'promote' | 'reject' | 'demote';
+
+async function callSystemStageControl<T = any>(
+  action: SystemStageAction,
+  roomId: string,
+  targetUserId?: string,
+): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('stage-control', {
+    body: { action, roomId, targetUserId: targetUserId || null },
+  });
+  if (!error) return data as T;
+
+  let message = error.message || 'Sahne işlemi başarısız.';
+  try {
+    const payload = await (error as any)?.context?.json?.();
+    if (payload?.error) message = payload.error;
+  } catch {
+    // Network/parse errors keep the original Functions client message.
+  }
+  throw new Error(message);
+}
+
 // ============================================
 // FAZ 4.3 — Tag enrichment helper
 // ============================================
@@ -1755,12 +1779,45 @@ export const RoomService = {
    * ★ B4 FIX: speaking_mode backend kontrolü eklendi.
    */
   async requestToSpeak(roomId: string, userId: string): Promise<void> {
+    if (isSystemRoom(roomId)) {
+      await callSystemStageControl('request', roomId);
+      return;
+    }
     // Clubhouse modeli: dinleyici doğrudan sahneye çıkamaz; her zaman el kaldırır.
     await supabase
       .from('room_participants')
       .update({ role: 'pending_speaker', hand_raised_at: new Date().toISOString() })
       .eq('room_id', roomId)
       .eq('user_id', userId);
+  },
+
+  async cancelStageRequest(roomId: string): Promise<void> {
+    if (isSystemRoom(roomId)) {
+      await callSystemStageControl('cancel', roomId);
+    }
+  },
+
+  async rejectStageRequest(roomId: string, userId: string): Promise<void> {
+    if (isSystemRoom(roomId)) {
+      await callSystemStageControl('reject', roomId, userId);
+    }
+  },
+
+  async getSystemStageRequests(roomId: string): Promise<string[]> {
+    if (!isSystemRoom(roomId)) return [];
+    const result = await callSystemStageControl<{ user_ids?: string[] }>('list', roomId);
+    return Array.isArray(result?.user_ids) ? result.user_ids : [];
+  },
+
+  async heartbeatSystemStageDelegate(
+    roomId: string,
+  ): Promise<{ is_delegate: boolean; delegate_user_id: string | null; lease_until: string | null }> {
+    const result = await callSystemStageControl<any>('heartbeat', roomId);
+    return {
+      is_delegate: result?.is_delegate === true,
+      delegate_user_id: result?.delegate_user_id || null,
+      lease_until: result?.lease_until || null,
+    };
   },
 
   /**
@@ -1790,7 +1847,16 @@ export const RoomService = {
    * Owner+moderator yoksa listener 5 dk süreyle speaker olur, 60sn cooldown.
    * Returns: { expires_at, duration_sec } başarılıysa.
    */
-  async claimStageSeat(roomId: string, userId: string): Promise<{ expires_at: string; duration_sec: number }> {
+  async claimStageSeat(roomId: string, userId: string): Promise<{ expires_at: string | null; duration_sec: number; delegate_user_id?: string | null; lease_until?: string | null }> {
+    if (isSystemRoom(roomId)) {
+      const result = await callSystemStageControl<any>('claim', roomId);
+      return {
+        expires_at: null,
+        duration_sec: 0,
+        delegate_user_id: result?.delegate_user_id || userId,
+        lease_until: result?.lease_until || null,
+      };
+    }
     // p_executor_id yalnızca JWT çağrısını doğrular; kimliğin yerine geçmez.
     const { data, error } = await supabase.rpc('claim_stage_seat', {
       p_room_id: roomId,
@@ -1813,6 +1879,10 @@ export const RoomService = {
   },
 
   async promoteSpeaker(roomId: string, userId: string, executorId?: string): Promise<void> {
+    if (isSystemRoom(roomId)) {
+      await callSystemStageControl('promote', roomId, userId);
+      return;
+    }
     // ★ 2026-04-29: RPC ZORUNLU. Fallback direct UPDATE v19 trigger'a yakalanıyor
     //   ("Role değişikliği reddedildi" hatası). RPC fail ederse net mesaj göster.
     try {
@@ -1860,6 +1930,13 @@ export const RoomService = {
     userId: string,
     executorId?: string,
   ): Promise<{ cooldown_until: string | null; cooldown_sec: number }> {
+    if (isSystemRoom(roomId)) {
+      const result = await callSystemStageControl<any>('demote', roomId, userId);
+      return {
+        cooldown_until: result?.cooldown_until || null,
+        cooldown_sec: Number(result?.cooldown_sec) || 0,
+      };
+    }
     const { data, error } = await supabase.rpc('demote_speaker_atomic', {
       p_room_id: roomId,
       p_user_id: userId,

@@ -70,7 +70,8 @@ export async function getLobiRoom(): Promise<Room | null> {
       .select(`
         id, name, description, category, type, host_id,
         is_live, is_persistent, is_system_room,
-        listener_count, room_settings, created_at, owner_tier
+        listener_count, max_speakers, room_settings, created_at, owner_tier,
+        stage_delegate_user_id, stage_delegate_lease_until, stage_delegate_assigned_at
       `)
       .eq('id', LOBI_ROOM_ID)
       .maybeSingle();

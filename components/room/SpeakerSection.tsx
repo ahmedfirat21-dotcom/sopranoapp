@@ -98,6 +98,7 @@ interface MicStatus {
 
 interface Props {
   stageUsers: RoomParticipant[];
+  stageDelegateUserId?: string | null;
   getMicStatus: (uid: string) => MicStatus;
   onSelectUser: (user: RoomParticipant) => void;
   onSelfDemote?: () => void;
@@ -617,13 +618,14 @@ function SpeakerBadgeCenter({ x, y, scale, expected, children }: {
   );
 }
 
-function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute, isSpotlight, showFollowButton, isFollowing, onFollowPress }: {
+function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, isMe, isStageDelegate, cardWidth: rawCardWidth, cardHeight: rawCardHeight, VideoView, canModerate, onQuickMute, isSpotlight, showFollowButton, isFollowing, onFollowPress }: {
   canModerate?: boolean;
   onQuickMute?: () => void;
   user: RoomParticipant; micStatus: MicStatus; onPress: () => void;
   onSelfDemote?: () => void;
   onCameraExpand?: (user: RoomParticipant) => void;
   isMe: boolean; cardWidth: number; cardHeight: number; VideoView?: any;
+  isStageDelegate?: boolean;
   /** ★ v1.7.13.12: Spotlight modunda mi (kamerali rectangular tile) yoksa audio
    *  uniform grid'de mi? Spotlight → parent cardHeight kullanir (admin spotlight
    *  aspect). Audio uniform + kamera acik → admin heightRatio uygulanir. */
@@ -835,6 +837,12 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
     //   Gerçek "kendi konumundan kayma" için FLIP technique gerekir (shared element).
     //   Şimdilik instant — kullanıcı pozisyon değişimini görür, zıplama yok.
     <View style={[s.speakerCard, { width: cardWidth }]}>
+      {isStageDelegate && (
+        <View pointerEvents="none" style={s.stageDelegateBadge}>
+          <Ionicons name="shield-checkmark" size={10} color="#071A18" />
+          <Text style={s.stageDelegateBadgeText}>Sahne Sorumlusu</Text>
+        </View>
+      )}
       {/* ★ v286 (16 May 2026): Host halo (Skia) + opsiyonel pulse — config-driven.
           Frame yüklü değilse aktif (frame zaten kendi halkasını taşır).
           ★ v298.5 (17 May 2026): KAMERA modda halo DEVRE DIŞI — card rectangular
@@ -1383,7 +1391,7 @@ function SpeakerCard({ user, micStatus, onPress, onSelfDemote, onCameraExpand, i
 }
 
 
-export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand, canModerate, onQuickMute, followedIds, onFollow }: Props) {
+export default function SpeakerSection({ stageUsers, stageDelegateUserId, getMicStatus, onSelectUser, onSelfDemote, currentUserId, VideoView, onGhostSeatPress, showSeatTooltip, avatarFlashes, onFlashDone, onCameraExpand, canModerate, onQuickMute, followedIds, onFollow }: Props) {
   // ★ 2026-04-22: Runtime window width — fiziksel Android cihazda gesture-nav/
   //   rotation ile değişen dimensions'a adapte olur.
   const { width: W } = useWindowDimensions();
@@ -1541,7 +1549,8 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 onCameraExpand={onCameraExpand}
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe} cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView}
+                isMe={isMe} isStageDelegate={u.user_id === stageDelegateUserId}
+                cardWidth={spotlightW} cardHeight={spotlightH} VideoView={VideoView}
                 isSpotlight={true}
                 showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
                 isFollowing={!!followedIds?.has(u.user_id)}
@@ -1577,7 +1586,7 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                   onCameraExpand={onCameraExpand}
                   canModerate={canModerate?.(u) ?? false}
                   onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                  isMe={isMe}
+                  isMe={isMe} isStageDelegate={u.user_id === stageDelegateUserId}
                   cardWidth={audioMetrics.cardWidth}
                   cardHeight={audioMetrics.cardWidth}
                   VideoView={VideoView}
@@ -1612,7 +1621,8 @@ export default function SpeakerSection({ stageUsers, getMicStatus, onSelectUser,
                 onCameraExpand={onCameraExpand}
                 canModerate={canModerate?.(u) ?? false}
                 onQuickMute={onQuickMute ? () => onQuickMute(u) : undefined}
-                isMe={isMe} cardWidth={renderWidth} cardHeight={renderHeight} VideoView={VideoView}
+                isMe={isMe} isStageDelegate={u.user_id === stageDelegateUserId}
+                cardWidth={renderWidth} cardHeight={renderHeight} VideoView={VideoView}
                 showFollowButton={!!currentUserId && !!onFollow && u.user_id !== currentUserId}
                 isFollowing={!!followedIds?.has(u.user_id)}
                 onFollowPress={() => onFollow?.(u.user_id)} />
@@ -1681,6 +1691,13 @@ const s = StyleSheet.create({
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 },
   mainSpeakerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   speakerCard: { alignItems: 'center', marginBottom: 4, overflow: 'visible' },
+  stageDelegateBadge: {
+    position: 'absolute', top: -6, left: 4, zIndex: 80, elevation: 30,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderRadius: 9, paddingHorizontal: 6, paddingVertical: 3,
+    backgroundColor: '#2DD4BF', borderWidth: 1, borderColor: 'rgba(255,255,255,0.75)',
+  },
+  stageDelegateBadgeText: { color: '#071A18', fontSize: 8, fontWeight: '800' },
   speakerCardInner: { width: '100%', borderRadius: 22, overflow: 'hidden', backgroundColor: 'rgba(30,41,59,0.6)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
   speakerAvatar: { width: '100%', height: '100%', resizeMode: 'cover' },
   roleBadge: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(15,23,42,0.8)' },

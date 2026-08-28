@@ -7,6 +7,7 @@ on:
       - fix/livekit-current-ui
       - fix/keyboard-overlay-root
       - fix/critical-audit-162
+      - fix/system-lobby-stage-163
 
 jobs:
   android:
@@ -43,7 +44,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.162-standalone-release-apk-aab
+          name: sopranochat-1.7.13.163-standalone-release-apk-aab
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab

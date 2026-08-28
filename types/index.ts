@@ -214,6 +214,11 @@ export type Room = {
   is_system_room?: boolean;
   /** Yapay zeka moderasyonlu mu? (sistem odaları için true) */
   ai_moderated?: boolean;
+  /** Sistem odasındaki tek, sınırlı sahne sorumlusu. Oda sahibi/moderatör değildir. */
+  stage_delegate_user_id?: string | null;
+  /** Sorumluluk lease'i; aktif istemci heartbeat ile yeniler. */
+  stage_delegate_lease_until?: string | null;
+  stage_delegate_assigned_at?: string | null;
 };
 
 export type RoomColorTheme = {
