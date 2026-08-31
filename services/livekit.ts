@@ -97,7 +97,9 @@ function getLK(): any {
 }
 
 // âââ Token Servisi ââââââââââââââââââââââââââââââââââââââââââ
-async function fetchToken(roomId: string, userId: string, displayName: string): Promise<string> {
+type LiveKitTokenResult = { token: string; role: string; canPublish: boolean };
+
+async function fetchToken(roomId: string, userId: string, displayName: string): Promise<LiveKitTokenResult> {
   // â Audit fix: 10s timeout â kÃ¶tÃ¼ aÄda hung request UI'Ä± dondurmuyor
   const { fetchWithTimeout } = await import('../utils/fetchTimeout');
   
@@ -157,8 +159,13 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
   }
 
   const data = await response.json();
+  if (!data?.token) throw new Error('Token yanıtı geçersiz');
   if (__DEV__) logger.log(`[LiveKit] Token alÄ±ndÄ± â roomId=${roomId}, role=${data.role || 'unknown'}`);
-  return data.token;
+  return {
+    token: data.token,
+    role: data.role || 'listener',
+    canPublish: data.canPublish === true,
+  };
 }
 
 // âââ Types ââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -179,6 +186,11 @@ export type RoomConnectionState = 'disconnected' | 'connecting' | 'connected' | 
 export class LiveKitService {
   private room: any = null; // livekit-client Room instance
   private currentRoomId: string | null = null; // Hangi oda baÄlÄ±, minimize-restore iÃ§in
+  private currentUserId: string | null = null;
+  private currentDisplayName: string | null = null;
+  private currentCanPublish = false;
+  private isRefreshingToken = false;
+  private tokenRefreshPromise: Promise<boolean> | null = null;
   private onParticipantUpdate?: (participants: ParticipantUpdate[]) => void;
   private onConnectionStateChange?: (state: RoomConnectionState) => void;
   private onSpeakingChange?: (identity: string, isSpeaking: boolean) => void;
@@ -310,6 +322,8 @@ export class LiveKitService {
     this.onParticipantDisconnected = callbacks.onParticipantDisconnected;
     this.onPermissionDenied = callbacks.onPermissionDenied;
     this.onConnectionQualityChange = callbacks.onConnectionQualityChange;
+    this.currentUserId = userId;
+    this.currentDisplayName = displayName;
 
     // â Tier bazlÄ± kalite ayarlarÄ± uygula
     if (qualityPreset) {
@@ -370,7 +384,7 @@ export class LiveKitService {
               })
             : Promise.resolve();
 
-        const [token] = await Promise.all([
+        const [tokenInfo] = await Promise.all([
           Promise.race([
             fetchToken(roomId, userId, displayName),
             new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
@@ -380,11 +394,12 @@ export class LiveKitService {
 
         // BaÄlantÄ±: 15sn timeout
         await Promise.race([
-          this.room.connect(LIVEKIT_URL, token),
+          this.room.connect(LIVEKIT_URL, tokenInfo.token),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Connect timeout (15s)')), 15000)),
         ]);
 
         this.currentRoomId = roomId;
+        this.currentCanPublish = tokenInfo.canPublish;
         this.onConnectionStateChange?.('connected');
 
         // â 2026-04-20 LATE-JOINER FIX: Connect sonrasÄ± mevcut remoteParticipant'larÄ±n
@@ -568,6 +583,9 @@ export class LiveKitService {
       }
       this.room = null;
       this.currentRoomId = null;
+      this.currentUserId = null;
+      this.currentDisplayName = null;
+      this.currentCanPublish = false;
     }
     // â AudioSession Ä± kapat â kaynaklarÄ± serbest bÄ±rak
     if (_audioSessionModule) {
@@ -584,6 +602,57 @@ export class LiveKitService {
   }
 
   // âââ Mikrofon AÃ§/Kapat ââââââââââââââââââââââââââââââââââ
+  /**
+   * Listener token'ı yayın yetkisi taşımaz. Kullanıcı DB'de speaker/owner/moderator
+   * olduğunda yeni rol token'ı alıp aynı Room nesnesi üzerinde kısa reconnect yapar.
+   */
+  private async refreshTokenForRole(): Promise<boolean> {
+    if (this.currentCanPublish) return true;
+    if (this.tokenRefreshPromise) return this.tokenRefreshPromise;
+
+    this.tokenRefreshPromise = (async () => {
+      const activeRoom = this.room;
+      const roomId = this.currentRoomId;
+      const userId = this.currentUserId;
+      const displayName = this.currentDisplayName;
+      if (!activeRoom || !roomId || !userId || !displayName) return false;
+
+      try {
+        const tokenInfo = await fetchToken(roomId, userId, displayName);
+        if (!tokenInfo.canPublish) {
+          if (__DEV__) logger.warn('[LiveKit] Rol tokenı hâlâ yayın yetkisi vermiyor:', tokenInfo.role);
+          return false;
+        }
+
+        this.isRefreshingToken = true;
+        this.onConnectionStateChange?.('reconnecting');
+        await activeRoom.disconnect(false);
+        if (this.room !== activeRoom) return false;
+        await Promise.race([
+          activeRoom.connect(LIVEKIT_URL, tokenInfo.token),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Role token reconnect timeout')), 12000)),
+        ]);
+        this.currentCanPublish = true;
+        this.onConnectionStateChange?.('connected');
+        this.emitParticipantUpdate(getLK());
+        return true;
+      } catch (error) {
+        if (__DEV__) logger.warn('[LiveKit] Rol tokenı yenilenemedi:', (error as any)?.message);
+        this.currentCanPublish = false;
+        this.onConnectionStateChange?.('disconnected');
+        return false;
+      } finally {
+        this.isRefreshingToken = false;
+      }
+    })();
+
+    try {
+      return await this.tokenRefreshPromise;
+    } finally {
+      this.tokenRefreshPromise = null;
+    }
+  }
+
   async toggleMicrophone(): Promise<boolean> {
     if (!this.room?.localParticipant) {
       if (__DEV__) logger.warn('[LiveKit] toggleMic: room veya localParticipant yok');
@@ -594,6 +663,10 @@ export class LiveKitService {
       return false;
     }
     const enabled = this.room.localParticipant.isMicrophoneEnabled;
+    if (!enabled && !this.currentCanPublish) {
+      const refreshed = await this.refreshTokenForRole();
+      if (!refreshed || this.room?.state !== 'connected') return false;
+    }
     try {
       const opts = !enabled ? this.getAudioConstraints() : undefined;
       await Promise.race([
@@ -619,6 +692,10 @@ export class LiveKitService {
     if (!this.room?.localParticipant) return false;
     if (this.room.state !== 'connected') return false;
     if (this.room.localParticipant.isMicrophoneEnabled) return true; // zaten aÃ§Ä±k
+    if (!this.currentCanPublish) {
+      const refreshed = await this.refreshTokenForRole();
+      if (!refreshed || this.room?.state !== 'connected') return false;
+    }
     try {
       await Promise.race([
         this.room.localParticipant.setMicrophoneEnabled(true, this.getAudioConstraints()),
@@ -681,6 +758,10 @@ export class LiveKitService {
     if (!this.room?.localParticipant) return;
     if (this.room.state !== 'connected') return;
     if (this.room.localParticipant.isCameraEnabled) return;
+    if (!this.currentCanPublish) {
+      const refreshed = await this.refreshTokenForRole();
+      if (!refreshed || this.room?.state !== 'connected') return;
+    }
     try {
       // â v1.7.13.142: videoMaxRes enforcement â tier bazlÄ± Ã§Ã¶zÃ¼nÃ¼rlÃ¼k limiti
       const videoConstraints = this.videoMaxRes ? {
@@ -755,6 +836,10 @@ export class LiveKitService {
     if (!this.room?.localParticipant) return false;
     if (this.room.state !== 'connected') return false;
     const enabled = this.room.localParticipant.isCameraEnabled;
+    if (!enabled && !this.currentCanPublish) {
+      const refreshed = await this.refreshTokenForRole();
+      if (!refreshed || this.room?.state !== 'connected') return false;
+    }
     try {
       // â v1.7.13.142: videoMaxRes enforcement â tier bazlÄ± Ã§Ã¶zÃ¼nÃ¼rlÃ¼k limiti
       const videoConstraints = !enabled && this.videoMaxRes ? {
@@ -1073,8 +1158,13 @@ export class LiveKitService {
         if (evt === lk.RoomEvent.ConnectionStateChanged) {
           const state = args[0];
           if (state === lk.ConnectionState.Connected) this.onConnectionStateChange?.('connected');
-          else if (state === lk.ConnectionState.Disconnected) this.onConnectionStateChange?.('disconnected');
-          else if (state === lk.ConnectionState.Reconnecting) this.onConnectionStateChange?.('reconnecting');
+          else if (state === lk.ConnectionState.Disconnected) {
+            // Rol token'ı yenilenirken yapılan kontrollü disconnect, hook'un ikinci
+            // bir reconnect döngüsü başlatmasına yol açmamalı.
+            if (!this.isRefreshingToken) this.onConnectionStateChange?.('disconnected');
+          } else if (state === lk.ConnectionState.Reconnecting) {
+            this.onConnectionStateChange?.('reconnecting');
+          }
         }
 
         // â KatÄ±lÄ±mcÄ± ayrÄ±ldÄ±ÄÄ±nda callback tetikle
