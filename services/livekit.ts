@@ -390,7 +390,7 @@ export class LiveKitService {
         const [tokenInfo] = await Promise.all([
           Promise.race([
             fetchToken(roomId, userId, displayName),
-            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
           ]),
           preparePromise,
         ]);
