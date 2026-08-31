@@ -83,14 +83,9 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
     //   Eski modal kullanıcıyı uygulamadan çıkarıp Settings'e atıyordu, kötü UX.
     // ensureBatteryExemptionOnce().catch(() => {});
 
-    // ★ v1.7.13.140 (21 May 2026): SDP collision fix — Lobi gir/çık/gir gibi hızlı
-    //   re-enter akışlarında server eski session'ı henüz cleanup etmemiş olabiliyor.
-    //   Yeni offer "unable to set offer / ERROR_CONTENT" ile reddediliyor.
-    //   Önce explicit disconnect + 250ms server cleanup penceresi.
-    try { await liveKitService.disconnect(); } catch { /* zaten disconnect olabilir */ }
-    await new Promise(r => setTimeout(r, 250));
-    if (!mountedRef.current) { connectingRef.current = false; return; }
-
+    // Bağlantı servisi aynı odaya zaten bağlıysa callback'leri yeniden bağlar;
+    // stale oda varsa kendi retry akışında temizler. Burada zorla disconnect etmek,
+    // LiveKit'in hızlı-resume/reconnect oturumunu iptal edip her girişe 250ms ekliyordu.
     const success = await liveKitService.connect(roomId, userId, displayName, {
       onConnectionStateChange: (state) => {
         if (!mountedRef.current) return;
@@ -239,10 +234,11 @@ export default function useLiveKit({ roomId, enabled = true, userId, displayName
       const nowActive = nextState === 'active';
 
       if (wasBackground && nowActive && enabledRef.current && roomId && userId) {
-        // Bağlantı koptuysa veya kopuyor ise yeniden bağlanmayı dene
+        // SDK connecting/reconnecting durumundayken oturumu bozma; yalnız tamamen
+        // disconnected ise yeni bağlantı akışı başlat.
         const currentState = connectionStateRef.current;
-        if (currentState !== 'connected') {
-          if (__DEV__) console.log('[useLiveKit] Foreground active — reconnect tetikleniyor (state:', currentState, ')');
+        if (currentState === 'disconnected') {
+          if (__DEV__) console.log('[useLiveKit] Foreground active — disconnected, reconnect tetikleniyor');
           reconnectCountRef.current = 0; // Sayacı sıfırla, yeni döngü
           if (reconnectTimerRef.current) {
             clearTimeout(reconnectTimerRef.current);
