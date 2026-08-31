@@ -1,162 +1,229 @@
-// Supabase Edge Function: LiveKit Token Generator
-// ═══════════════════════════════════════════════════════════════════
-// Firebase Auth (JWT) → Supabase RLS ile kullanıcı doğrulanır; ardından
-// DB'den `room_participants` satırı okunur. Row yoksa (checkAccess geçmedi)
-// veya ban varsa token verilmez. Rol'e göre canPublish ayarlanır.
-//
-// ★ 2026-04-18 HARDENING: Önceki versiyon sadece auth header varlığını
-// kontrol ediyordu; client arbitrary roomId'ye token isteyerek şifreli/
-// banlı/kilitli odalara giriyordu. Ayrıca canPublish her role için true
-// idi — pending_speaker ve listener mic açabiliyordu.
-// ═══════════════════════════════════════════════════════════════════
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.100.1";
 import { AccessToken } from "npm:livekit-server-sdk@2.6.1";
+
+const FIREBASE_PROJECT_ID = "sopranochat-5738e";
+const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
+const FIREBASE_JWKS_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
+const CERT_TTL_MS = 30 * 60 * 1000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-firebase-auth",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Publish yetkisi olan roller
-const PUBLISH_ROLES = new Set(["owner", "moderator", "speaker"]);
-// Odaya girişi engelleyen roller (banned vs — row silinmiş olmalı ama defense-in-depth)
-const BLOCKED_ROLES = new Set(["banned"]);
+type FirebaseClaims = {
+  sub: string;
+  iss: string;
+  aud: string | string[];
+  exp: number;
+  iat: number;
+};
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+type JwksResponse = { keys: JsonWebKey[] };
+let jwksCache: { keys: JsonWebKey[]; fetchedAt: number } | null = null;
+
+const BLOCKED_ROLES = new Set(["banned"]);
+const roomIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function decodeBase64Url(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+}
+
+function decodeJsonPart<T>(value: string): T {
+  return JSON.parse(new TextDecoder().decode(decodeBase64Url(value))) as T;
+}
+
+async function getFirebaseJwks(): Promise<JsonWebKey[]> {
+  const now = Date.now();
+  if (jwksCache && now - jwksCache.fetchedAt < CERT_TTL_MS) return jwksCache.keys;
+
+  const response = await fetch(FIREBASE_JWKS_URL);
+  if (!response.ok) throw new Error("Firebase doğrulama anahtarları alınamadı.");
+  const payload = await response.json() as JwksResponse;
+  if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+    throw new Error("Firebase doğrulama anahtarları geçersiz.");
+  }
+  jwksCache = { keys: payload.keys, fetchedAt: now };
+  return payload.keys;
+}
+
+async function verifyFirebaseToken(token: string): Promise<FirebaseClaims> {
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Geçersiz oturum anahtarı.");
+
+  const header = decodeJsonPart<{ alg?: string; kid?: string }>(parts[0]);
+  const claims = decodeJsonPart<FirebaseClaims>(parts[1]);
+  if (header.alg !== "RS256" || !header.kid) {
+    throw new Error("Geçersiz oturum algoritması.");
+  }
+
+  const jwks = await getFirebaseJwks();
+  const jwk = jwks.find((key) => key.kid === header.kid);
+  if (!jwk) throw new Error("Oturum imza anahtarı bulunamadı.");
+
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  const signedBytes = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  const signature = decodeBase64Url(parts[2]);
+  const validSignature = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    publicKey,
+    signature,
+    signedBytes,
+  );
+  if (!validSignature) throw new Error("Oturum imzası doğrulanamadı.");
+
+  const now = Math.floor(Date.now() / 1000);
+  const audienceValid = Array.isArray(claims.aud)
+    ? claims.aud.includes(FIREBASE_PROJECT_ID)
+    : claims.aud === FIREBASE_PROJECT_ID;
+  if (claims.iss !== FIREBASE_ISSUER || !audienceValid) {
+    throw new Error("Oturum kaynağı geçersiz.");
+  }
+  if (!claims.sub || claims.sub.length > 128) {
+    throw new Error("Kullanıcı kimliği geçersiz.");
+  }
+  if (!Number.isFinite(claims.exp) || claims.exp <= now) {
+    throw new Error("Oturumun süresi dolmuş.");
+  }
+  if (!Number.isFinite(claims.iat) || claims.iat > now + 300) {
+    throw new Error("Oturum zamanı geçersiz.");
+  }
+  return claims;
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") {
+    return jsonResponse(405, { error: "Yalnızca POST desteklenir." });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const apiKeyHeader = req.headers.get("apikey");
+    const firebaseToken = request.headers.get("x-firebase-auth")?.trim();
+    if (!firebaseToken) return jsonResponse(401, { error: "Oturum gerekli." });
 
-    if (!authHeader && !apiKeyHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authorization header missing" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const claims = await verifyFirebaseToken(firebaseToken);
+    const body = await request.json() as {
+      roomId?: string;
+      userId?: string;
+      displayName?: string;
+    };
+    const roomId = body.roomId?.trim() || "";
+    const userId = body.userId?.trim() || "";
+    const displayName = body.displayName?.trim().slice(0, 80) || "User";
+
+    if (!roomIdPattern.test(roomId)) {
+      return jsonResponse(400, { error: "Geçersiz oda kimliği." });
+    }
+    if (!userId || userId.length > 128) {
+      return jsonResponse(400, { error: "Geçersiz kullanıcı kimliği." });
+    }
+    if (claims.sub !== userId) {
+      return jsonResponse(403, { error: "Kullanıcı kimliği eşleşmiyor." });
     }
 
-    const LIVEKIT_API_KEY = Deno.env.get("LIVEKIT_API_KEY");
-    const LIVEKIT_API_SECRET = Deno.env.get("LIVEKIT_API_SECRET");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-
-    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-      return new Response(
-        JSON.stringify({ error: "LiveKit credentials not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Supabase credentials not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Sunucu yapılandırması eksik.");
     }
 
-    const { roomId, displayName, userId } = await req.json();
-
-    if (!roomId || !userId) {
-      return new Response(
-        JSON.stringify({ error: "roomId and userId are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ★ 2026-04-30 FIX: Firebase JWT artık X-Firebase-Auth header'ında geliyor.
-    //   Supabase API Gateway asymmetric JWT'yi reddediyor (401), bu yüzden
-    //   Authorization header'ında her zaman Anon Key gönderiliyor.
-    //   Edge Function Firebase JWT'yi custom header'dan okuyup Supabase client'a aktarır.
-    const firebaseAuthHeader = req.headers.get("x-firebase-auth");
-    const effectiveAuth = firebaseAuthHeader
-      ? `Bearer ${firebaseAuthHeader}`
-      : (authHeader || `Bearer ${SUPABASE_ANON_KEY}`);
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: effectiveAuth } },
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // ── 1. Oda var mı ve canlı mı? ──
-    const { data: roomRow, error: roomErr } = await supabase
-      .from("rooms")
-      .select("id, host_id, is_live")
-      .eq("id", roomId)
-      .maybeSingle();
+    // Vault ve oda kontrolleri bağımsızdır; cold-start gecikmesini büyütmemek
+    // için tek tek beklemek yerine paralel çalıştırılır.
+    const [credentialResult, roomResult, banResult, participantResult] =
+      await Promise.all([
+        admin.rpc("get_livekit_credentials").single(),
+        admin
+          .from("rooms")
+          .select("id, is_live, is_system_room")
+          .eq("id", roomId)
+          .maybeSingle(),
+        admin
+          .from("room_bans")
+          .select("id, expires_at")
+          .eq("room_id", roomId)
+          .eq("user_id", userId)
+          .maybeSingle(),
+        admin
+          .from("room_participants")
+          .select("role, is_muted")
+          .eq("room_id", roomId)
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]);
 
-    if (roomErr || !roomRow) {
-      return new Response(
-        JSON.stringify({ error: "Oda bulunamadı." }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const credentials = credentialResult.data as
+      | { api_key?: string; api_secret?: string }
+      | null;
+    if (
+      credentialResult.error ||
+      !credentials?.api_key ||
+      !credentials?.api_secret
+    ) {
+      throw new Error("LiveKit kimlik bilgileri alınamadı.");
     }
-    if (!roomRow.is_live) {
-      return new Response(
-        JSON.stringify({ error: "Oda aktif değil." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
-    // ── 2. Ban kontrolü (defense-in-depth; INSERT policy zaten engeller) ──
-    const { data: banRow } = await supabase
-      .from("room_bans")
-      .select("id, expires_at")
-      .eq("room_id", roomId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    if (roomResult.error) throw new Error("Oda bilgisi alınamadı.");
+    const roomRow = roomResult.data;
+    if (!roomRow) return jsonResponse(404, { error: "Oda bulunamadı." });
+    if (!roomRow.is_live) return jsonResponse(403, { error: "Oda aktif değil." });
 
+    if (banResult.error) throw new Error("Oda yasaklama bilgisi alınamadı.");
+    const banRow = banResult.data;
     if (banRow) {
-      const expired = banRow.expires_at && new Date(banRow.expires_at) < new Date();
-      if (!expired) {
-        return new Response(
-          JSON.stringify({ error: "Bu odadan yasaklandınız." }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      const expired =
+        !!banRow.expires_at && new Date(banRow.expires_at).getTime() <= Date.now();
+      if (!expired) return jsonResponse(403, { error: "Bu odadan yasaklandınız." });
     }
 
-    // ── 3. Kullanıcının rolünü belirle (varsa) ──
-    // ★ 2026-04-18 FIX: Participant row ZORUNLU değil — LiveKit token bazen
-    // DB INSERT'ten önce istenebilir (race). Şifre/davet kontrolü zaten
-    // RoomAccessService + UI accessGate ile frontend'de; bu edge function
-    // sadece ban kontrolü + rol bazlı canPublish belirler.
-    const { data: partRow } = await supabase
-      .from("room_participants")
-      .select("role, is_muted")
-      .eq("room_id", roomId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    // Varsa engelli rolü kontrolü
-    if (partRow && BLOCKED_ROLES.has(partRow.role)) {
-      return new Response(
-        JSON.stringify({ error: "Bu odaya erişim engelli." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (participantResult.error) {
+      throw new Error("Katılımcı bilgisi alınamadı.");
+    }
+    const participant = participantResult.data;
+    // Normal odalarda access/join tamamlanmadan token verilmez. Kalıcı sistem
+    // lobisi ise bağlantıyı hızlandırmak için DB join ile paralel bağlanabilir.
+    if (!participant && !roomRow.is_system_room) {
+      return jsonResponse(403, { error: "Önce odaya katılmalısınız." });
+    }
+    if (participant && BLOCKED_ROLES.has(participant.role)) {
+      return jsonResponse(403, { error: "Bu odaya erişim engelli." });
     }
 
-    // ── 4. Publish yetkisi belirle ──
-    // ★ v1.7.13.138 SECURITY FIX: canPublish ROLE-BASED.
-    //   Önceden HER ZAMAN true idi (token refresh sorunu için). Sonuç: modifiye
-    //   client listener'ken ses açıp "hayalet ses" yapabiliyordu.
-    //   Şimdi sadece owner/speaker/moderator publish edebilir.
-    //   Promote sonrası client livekit-token RPC'sini yeniden çağırır + fresh
-    //   token alır (services/livekit.ts:refreshTokenForRole helper).
-    const effectiveRole = partRow?.role || "listener";
-    const canPublish = ['owner', 'speaker', 'moderator'].includes(effectiveRole);
+    const effectiveRole = participant?.role || "listener";
 
-    // ── 5. Token oluştur ──
-    const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    // v163 sahneye çıkarken token yenilemiyor. Bu nedenle yayın izni token
+    // seviyesinde açık kalır; uygulama ve sunucu sahne rolü/mute işlemlerini
+    // yönetir. Kimlik sahteciliği ise yukarıdaki Firebase subject eşleştirmesiyle
+    // engellenmiştir.
+    const canPublish = true;
+    const token = new AccessToken(credentials.api_key, credentials.api_secret, {
       identity: userId,
-      name: displayName || "User",
+      name: displayName,
       ttl: "6h",
+      metadata: JSON.stringify({ role: effectiveRole }),
     });
-
     token.addGrant({
       room: roomId,
       roomJoin: true,
@@ -165,22 +232,15 @@ serve(async (req: Request) => {
       canPublishData: true,
     });
 
-    const jwt = await token.toJwt();
-
-    return new Response(
-      JSON.stringify({ token: jwt, role: effectiveRole, canPublish }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse(200, {
+      token: await token.toJwt(),
+      role: effectiveRole,
+      canPublish,
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    const message =
+      error instanceof Error ? error.message : "Ses bağlantısı hazırlanamadı.";
+    const unauthorized = /oturum|imza|firebase|token|kimliği eşleşmiyor/i.test(message);
+    return jsonResponse(unauthorized ? 401 : 500, { error: message });
   }
 });
