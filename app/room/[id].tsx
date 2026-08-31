@@ -2382,6 +2382,9 @@ export default function RoomScreen() {
         //   Eski davranış: hiç DB insert yok → listener_count 0, kullanıcı listede yok, flash.
         //   Şimdi: erişim kontrolünü atla, doğrudan join'e geç (open Lobi'de izin zaten var).
         if (isSystemRoom(id as string)) {
+          // Lobi herkese açık sistem odasıdır. Ses bağlantısını DB join/başlık refresh
+          // işlemlerini bekletmeden başlat; DB katılımı 163 ile uyumlu biçimde devam eder.
+          setAccessGranted(true);
           try {
             const joinedPart = await RoomService.join(id as string, firebaseUser.uid, 'listener');
             // Participants listesini yeni katılımla güncelle
@@ -2398,8 +2401,7 @@ export default function RoomScreen() {
           } catch (e) {
             if (__DEV__) console.warn('[Lobi] join failed:', e);
           }
-          setAccessGranted(true);
-          setLoading(false); // ★ Auto-join + room refresh tamamlandı → UI tek seferde açılır (flash yok)
+          setLoading(false); // DB katılımı ve başlık sayacı tamamlandı
           return;
         }
         // ★ 2026-04-21: OPEN + filtresiz odalarda access gate'i komple atla — gereksiz friction.
@@ -2867,8 +2869,8 @@ export default function RoomScreen() {
   // ★ v309 (18 May 2026): Periyodik participant polling — Firebase JWT'siz
   //   realtime postgres_changes DELETE event'leri fail olabiliyor (memory:
   //   project_dm_broadcast_system_v86). Realtime sync kaçırırsa, 15 saniyelik
-  //   polling güvenlik ağı UI'yı temiz tutar — çıkan kullanıcı en geç 15sn
-  //   içinde ekrandan kaybolur.
+  //   polling güvenlik ağı UI'yı temiz tutar. Realtime ana kanal olduğu için
+  //   yedek sorgu 30 saniyede bir çalışır; istemci ve DB yükü yarıya iner.
   useEffect(() => {
     if (!id || isSystemRoom(id as string)) return;
     const interval = setInterval(() => {
@@ -2881,7 +2883,7 @@ export default function RoomScreen() {
           }
         })
         .catch(() => {});
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [id]);
 
@@ -2910,7 +2912,7 @@ export default function RoomScreen() {
   //   geçici şanssız connect attempt'leri engellenmiş olur.
   const lk = useLiveKit({
     roomId: id as string,
-    enabled: !loading && !!room && accessGranted === true && !roomBlock,
+    enabled: !!room && accessGranted === true && !roomBlock,
     userId: firebaseUser?.uid,
     displayName: profile?.display_name,
     qualityPreset,
@@ -4196,14 +4198,20 @@ export default function RoomScreen() {
   //   kullanıcı JS thread yoğunluğunda (LiveKit audio) tek heartbeat kaçırdığında
   //   cleanup tarafından siliniyordu.
   useEffect(() => {
-    if (!id) return;
-    // ★ 2026-04-23: Gün sonu donmuş oda temizliği — oda açılışında 1 kez çalışır
+    if (!id || !firebaseUser?.uid || !room) return;
+    // Stale cleanup bütün dinleyicilerden aynı anda çalışmamalı. Normal odada
+    // sahip/admin, sistem odasında aktif sahne sorumlusu bu bakımı üstlenir.
+    const canRunCleanup =
+      profile?.is_admin === true ||
+      room.host_id === firebaseUser.uid ||
+      room.stage_delegate_user_id === firebaseUser.uid;
+    if (!canRunCleanup) return;
     RoomService.cleanupFrozenRooms().catch(() => {});
     const cu = setInterval(() => {
       RoomService.cleanupStaleParticipants(id as string).catch(() => {});
     }, 60000);
     return () => clearInterval(cu);
-  }, [id]);
+  }, [id, firebaseUser?.uid, profile?.is_admin, room?.host_id, room?.stage_delegate_user_id]);
 
   // ★ v32 Caretaker timer — kendi sahnemden otomatik in'erim
   // Owner/mod gelince trigger zaten stage_expires_at'i NULL yapar, o zaman bu effect
