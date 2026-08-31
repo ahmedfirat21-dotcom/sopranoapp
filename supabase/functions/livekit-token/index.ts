@@ -213,9 +213,14 @@ Deno.serve(async (request) => {
 
     const effectiveRole = participant?.role || "listener";
 
-    // Dinleyici token'ı yayın yapamaz. İstemci sahne rolü kazandığında bu
-    // endpoint'ten yeni token alıp kısa bir kontrollü reconnect uygular.
-    const canPublish = ["owner", "moderator", "speaker"].includes(effectiveRole);
+    // Yeni istemci dinleyici token'ını yayınsız alır ve sahne rolü kazandığında
+    // kontrollü token refresh yapar. Play'deki v163 bu protokolü bilmediği için,
+    // geçiş süresince yalnız işaret göndermeyen eski sürümlerde mevcut davranış korunur.
+    const supportsRoleRefresh =
+      request.headers.get("x-livekit-role-refresh") === "1";
+    const canPublish = supportsRoleRefresh
+      ? ["owner", "moderator", "speaker"].includes(effectiveRole)
+      : true;
     const token = new AccessToken(credentials.api_key, credentials.api_secret, {
       identity: userId,
       name: displayName,
