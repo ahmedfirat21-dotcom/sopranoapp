@@ -336,25 +336,21 @@ export class LiveKitService {
           }
         }
 
-        // Token alma: 35sn timeout (Supabase edge cold start iÃ§in â bazen 9-15sn sÃ¼rÃ¼yor)
-        const token = await Promise.race([
-          fetchToken(roomId, userId, displayName),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
-        ]);
-
-        // Her baÄlantÄ± denemesinde temiz room oluÅtur
+        // Her bağlantı denemesinde temiz bir Room oluştur.
         if (this.room) {
-          try { if (this.room.state === 'connected' || this.room.state === 'reconnecting') this.room.disconnect(); } catch(_) {}
+          try {
+            if (this.room.state === 'connected' || this.room.state === 'reconnecting') {
+              this.room.disconnect();
+            }
+          } catch (_) {}
           this.room = null;
         }
         this.room = new lk.Room({
           adaptiveStream: true,
           dynacast: true,
-          // â Ping/pong sÃ¼releri artÄ±rÄ±ldÄ± â emÃ¼latÃ¶r/yavaÅ aÄ toleransÄ±
-          pingTimeout: 15000,   // ping gÃ¶nderme aralÄ±ÄÄ± (ms)
-          pongTimeout: 60000,   // pong bekleme sÃ¼resi (ms)
+          pingTimeout: 15000,
+          pongTimeout: 60000,
           websocketTimeout: 30000,
-          // â Otomatik yeniden baÄlanma â baÄlantÄ± kesilirse LiveKit kendisi deneyecek
           reconnectPolicy: {
             nextRetryDelayInMs: (context: any) => {
               const delay = Math.min(1000 * Math.pow(2, context?.retryCount || 0), 10000);
@@ -364,6 +360,23 @@ export class LiveKitService {
           },
         });
         this.setupEventListeners(lk);
+
+        // DNS/TLS bağlantısını token isteğiyle paralel ısıt. Bu çağrı medya
+        // bağlantısını başlatmaz; oda açılışındaki beklemeyi kısaltır.
+        const preparePromise =
+          typeof this.room.prepareConnection === 'function'
+            ? this.room.prepareConnection(LIVEKIT_URL).catch((err: any) => {
+                if (__DEV__) logger.warn('[LiveKit] prepareConnection başarısız, normal connect devam edecek:', err?.message);
+              })
+            : Promise.resolve();
+
+        const [token] = await Promise.all([
+          Promise.race([
+            fetchToken(roomId, userId, displayName),
+            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Token timeout (35s)')), 35000)),
+          ]),
+          preparePromise,
+        ]);
 
         // BaÄlantÄ±: 15sn timeout
         await Promise.race([
