@@ -985,7 +985,7 @@ export function PlusMenu({
   // ★ 2026-04-20: Tüm roller aynı sağdan-kayan drawer kullanır (compact bottom-sheet
   // kaldırıldı — kullanıcı talebi: "listener modal owner gibi yanal açılır olsun")
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 1000, elevation: 1000 }]} pointerEvents="box-none">
       <Animated.View style={[s.backdrop, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
