@@ -120,6 +120,9 @@ async function fetchToken(roomId: string, userId: string, displayName: string): 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       'apikey': SUPABASE_ANON_KEY,
+      // Bu sürüm rol değişiminde yeni token alabilir; sunucu listener
+      // token'ında yayın iznini yalnız bu işareti gönderen sürümlerde kapatır.
+      'X-LiveKit-Role-Refresh': '1',
     };
     // Firebase JWT varsa custom header'da gÃ¶nder â Edge Function bunu okuyup RLS context oluÅturur
     if (firebaseJwt) {
