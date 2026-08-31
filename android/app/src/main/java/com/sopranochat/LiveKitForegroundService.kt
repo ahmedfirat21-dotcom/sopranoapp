@@ -90,8 +90,9 @@ class LiveKitForegroundService : Service() {
                 "SopranoChat:LiveKitRoom"
             ).apply {
                 setReferenceCounted(false)
-                // 1 saat üst limit — emniyet vana (kullanıcı odadan çıkmayı unutsa bile)
-                acquire(60 * 60 * 1000L)
+                // Servis yalnız aktif oda boyunca çalışır; ACTION_STOP/onDestroy wake lock'ı
+                // bırakır. Süre sınırı uzun oturumlarda 1 saat sonra sessiz kopma yaratıyordu.
+                acquire()
             }
         } catch (_: Exception) { /* sessiz fail */ }
     }

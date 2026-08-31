@@ -8,6 +8,7 @@ on:
       - fix/keyboard-overlay-root
       - fix/critical-audit-162
       - fix/system-lobby-stage-163
+      - fix/lobby-livekit-store-hardening-164
 
 permissions:
   contents: read
@@ -84,7 +85,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sopranochat-1.7.13.163-signed-play-bundle
+          name: sopranochat-1.7.13.164-signed-play-bundle
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
