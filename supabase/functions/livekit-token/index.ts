@@ -213,11 +213,9 @@ Deno.serve(async (request) => {
 
     const effectiveRole = participant?.role || "listener";
 
-    // v163 sahneye çıkarken token yenilemiyor. Bu nedenle yayın izni token
-    // seviyesinde açık kalır; uygulama ve sunucu sahne rolü/mute işlemlerini
-    // yönetir. Kimlik sahteciliği ise yukarıdaki Firebase subject eşleştirmesiyle
-    // engellenmiştir.
-    const canPublish = true;
+    // Dinleyici token'ı yayın yapamaz. İstemci sahne rolü kazandığında bu
+    // endpoint'ten yeni token alıp kısa bir kontrollü reconnect uygular.
+    const canPublish = ["owner", "moderator", "speaker"].includes(effectiveRole);
     const token = new AccessToken(credentials.api_key, credentials.api_secret, {
       identity: userId,
       name: displayName,
