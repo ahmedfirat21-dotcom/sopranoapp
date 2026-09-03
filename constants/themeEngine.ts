@@ -1,5 +1,5 @@
-// SopranoChat — Tema Sistemi (Sabit Koyu Tema)
-// Tek tema: koyu lacivert (mockup DNA'sına göre)
+// SopranoChat — Retro Mobile tema sistemi
+// Web'deki nostaljik gri-metal + lavanta kimliğini mobilde yeniden yorumlar.
 
 export type ThemeKey = 'dark';
 
@@ -19,22 +19,22 @@ type ThemeColors = {
   glassBorder2: string;
 };
 
-// ★ 2026-04-20: Midnight Sapphire — pürüzsüz royal navy zemin, kart yüzeyleri
-//   hafif lift ile ayırt edilir. Solid renk, glow yok.
 const DARK_COLORS: ThemeColors = {
-  bg:  '#0F1929',   // Royal navy — ana uygulama zemini
-  bg2: '#070D17',   // En derin katman — modal backdrop
-  bg3: '#162236',   // Raised surface — kart içi fon
-  bg4: '#1F2E48',   // Elevated — modal/panel arka plan
-  bg5: '#2A3C5C',   // Highlighted — active/selected state
-  text: '#F1F5F9',
-  text2: '#A8B4C7',
-  text3: '#6B7A93',
-  glass: '#1C2840',
-  glass2: '#243350',
-  glass3: '#2C3E62',
-  glassBorder: 'rgba(125, 170, 229, 0.14)',
-  glassBorder2: 'rgba(125, 170, 229, 0.22)',
+  // Klasik SopranoChat lavanta zemini — mobilde biraz daha koyu tutulur ki
+  // mevcut beyaz metinler ve ekranlardaki kontrast bozulmasın.
+  bg:  '#727493',
+  bg2: '#3B3D50',
+  bg3: '#8588A8',
+  bg4: '#55586F',
+  bg5: '#A8ABC7',
+  text: '#FFFFFF',
+  text2: '#E4E6F1',
+  text3: '#C2C5D8',
+  glass: '#5E617D',
+  glass2: '#747795',
+  glass3: '#9194B1',
+  glassBorder: 'rgba(244,245,255,0.24)',
+  glassBorder2: 'rgba(255,255,255,0.42)',
 };
 
 export const THEME_PALETTES: Record<ThemeKey, ThemeColors> = {
@@ -42,7 +42,7 @@ export const THEME_PALETTES: Record<ThemeKey, ThemeColors> = {
 };
 
 export const THEME_LABELS: Record<ThemeKey, string> = {
-  dark: 'Koyu',
+  dark: 'Retro',
 };
 
 let currentTheme: ThemeKey = 'dark';
